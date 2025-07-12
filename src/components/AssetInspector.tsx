@@ -1,4 +1,4 @@
-import React from "react";
+
 
 export function AssetInspector({ data }: { data: any }) {
   if (!data) return <div className="terminal-box">No data available.</div>;

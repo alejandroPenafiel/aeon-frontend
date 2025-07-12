@@ -1,15 +1,19 @@
-import React from 'react';
+
 
 export function PnLSummary({ data }: { data: any }) {
-  if (!data || !data.margin_summary) {
+  // Defensive check for data and its structure
+  if (!data || typeof data.margin_summary !== 'object' || data.margin_summary === null) {
     return <div className="terminal-block">Waiting for PnL data...</div>;
   }
 
-  const {
-    margin_summary,
-    account_address,
-    timestamp,
-  } = data;
+  // Safely access each piece of data with defaults
+  const summary = data.margin_summary;
+  const accountValue = summary?.accountValue ?? 0;
+  const totalMarginUsed = summary?.totalMarginUsed ?? 'N/A';
+  const totalNtlPos = summary?.totalNtlPos ?? 'N/A';
+  const totalRawUsd = summary?.totalRawUsd ?? 'N/A';
+  const accountAddress = data.account_address ?? 'N/A';
+  const timestamp = data.timestamp;
 
   return (
     <div className="terminal-block">
@@ -18,32 +22,32 @@ export function PnLSummary({ data }: { data: any }) {
           <tr>
             <td>ACCOUNT ADDRESS</td>
             <td>:</td>
-            <td>{account_address}</td>
+            <td>{accountAddress}</td>
           </tr>
           <tr>
             <td>ACCOUNT VALUE</td>
             <td>:</td>
-            <td>${parseFloat(margin_summary.accountValue).toFixed(6)}</td>
+            <td>${parseFloat(accountValue).toFixed(6)}</td>
           </tr>
           <tr>
             <td>MARGIN USED</td>
             <td>:</td>
-            <td>{margin_summary.totalMarginUsed}</td>
+            <td>{totalMarginUsed}</td>
           </tr>
           <tr>
             <td>NET POSITION</td>
             <td>:</td>
-            <td>{margin_summary.totalNtlPos}</td>
+            <td>{totalNtlPos}</td>
           </tr>
           <tr>
             <td>RAW USD</td>
             <td>:</td>
-            <td>{margin_summary.totalRawUsd}</td>
+            <td>{totalRawUsd}</td>
           </tr>
           <tr>
             <td>UPDATED AT</td>
             <td>:</td>
-            <td>{new Date(timestamp).toLocaleString()}</td>
+            <td>{timestamp ? new Date(timestamp).toLocaleString() : 'N/A'}</td>
           </tr>
         </tbody>
       </table>

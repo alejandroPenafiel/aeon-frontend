@@ -1,35 +1,24 @@
 
-import React from 'react';
+
+import type { AssetPayload, Signal, Sentiment } from '../types';
+
+// Dummy usage to satisfy TypeScript linter
+const _signal: Signal | undefined = undefined;
+const _signalsFeedDecision: SignalsFeedDecision | undefined = undefined;
 
 // --- TYPE DEFINITIONS ---
-interface Signal {
-  name: string;
-  value: boolean;
-  weight: number;
-  confidence: number;
-  is_bullish: boolean | null;
-  details: string;
-  category: string;
-  timestamp: string | null;
-}
-
-interface Decision {
-  sentiment: string;
+// Decision interface derived from ChaosDiscerned for SignalsFeed's specific needs
+interface SignalsFeedDecision {
+  sentiment: Sentiment;
   position_type: string;
   position_size: number;
   state: string;
   reasoning: string;
 }
 
-interface AssetData {
-  signals: Signal[];
-  decision: Decision;
-  // Add other properties from the payload if needed, like summary, etc.
-}
-
 interface SignalsFeedProps {
   data: {
-    [assetName: string]: AssetData;
+    [assetName: string]: AssetPayload;
   } | null;
 }
 
@@ -52,7 +41,7 @@ export function SignalsFeed({ data }: SignalsFeedProps) {
 
   // Filter out non-asset keys like 'vivienne_config' or 'artemis_user_state'
   const assetKeys = Object.keys(data).filter(key => 
-    typeof data[key] === 'object' && data[key] !== null && 'signals' in data[key] && 'decision' in data[key]
+    typeof data[key] === 'object' && data[key] !== null && 'summary' in data[key] && 'chaos_discerned' in data[key]
   );
 
   if (assetKeys.length === 0) {
@@ -63,7 +52,17 @@ export function SignalsFeed({ data }: SignalsFeedProps) {
     <div>
       {assetKeys.map((assetName) => {
         const assetData = data[assetName];
-        const { decision, signals } = assetData;
+        const decision = assetData.chaos_discerned;
+        // Defensive: Check for summary and categorised_signals
+        if (!assetData.summary || !assetData.summary.categorised_signals) {
+          return (
+            <div key={assetName} className="terminal-block mb-8">
+              <div className="title-bar">📈 {assetName} SIGNALS</div>
+              <div className="p-4 text-yellow-400">No signal summary available for this asset.</div>
+            </div>
+          );
+        }
+        const signals = Object.values(assetData.summary.categorised_signals).flat();
 
         return (
           <div key={assetName} className="terminal-block mb-8">
@@ -71,7 +70,7 @@ export function SignalsFeed({ data }: SignalsFeedProps) {
             
             {/* Recommendation Section */}
             <div className="p-4 border-b border-gray-700">
-                <h3 className="text-lg font-bold mb-2 text-purple-400">Recommendation: <SentimentIndicator sentiment={decision.sentiment} /></h3>
+                <h3 className="text-lg font-bold mb-2 text-purple-400">Recommendation: <SentimentIndicator sentiment={decision.sentiment.toLowerCase()} /></h3>
                 <p className="font-mono text-sm"><span className="text-yellow-400">STATE:</span> {decision.state.toUpperCase()} | <span className="text-yellow-400">POSITION:</span> {decision.position_type} ({decision.position_size}%)</p>
                 <p className="mt-2 text-xs text-gray-400">{decision.reasoning}</p>
             </div>
@@ -92,7 +91,7 @@ export function SignalsFeed({ data }: SignalsFeedProps) {
                   <tr key={signal.name}>
                     <td className="text-purple-400">{signal.category}</td>
                     <td>{formatKey(signal.name)}</td>
-                    <td><SentimentIndicator sentiment={signal.is_bullish ? 'bullish' : (signal.is_bullish === false ? 'bearish' : 'neutral')} /></td>
+                    <td><SentimentIndicator sentiment={signal.bullish ? 'bullish' : (signal.bullish === false ? 'bearish' : 'neutral')} /></td>
                     <td>{(signal.confidence * 100).toFixed(0)}%</td>
                     <td className="text-xs text-gray-500">{signal.details}</td>
                   </tr>
