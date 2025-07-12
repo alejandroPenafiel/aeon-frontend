@@ -1,35 +1,21 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useWebSocket } from './hooks/useWebSocket';
+import { PnLSummary } from './components/PnLSummary';
+import { SystemStatus } from './components/SystemStatus';
+import { SignalsFeed } from './components/SignalsFeed';
+import { AssetInspector } from './components/AssetInspector';
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { data: payload }: { data: any } = useWebSocket("ws://localhost:8000/ws/state");
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{ backgroundColor: "#000", minHeight: "100vh", padding: "2rem", color: "#eee" }}>
+      <PnLSummary data={payload?.data?.artemis_user_state} />
+      <SignalsFeed data={payload?.data?.vivienne_clarity} />
+      <SystemStatus data={payload?.data} />
+      <AssetInspector data={payload?.data} />
+    </div>
+  );
 }
 
 export default App
