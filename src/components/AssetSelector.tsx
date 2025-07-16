@@ -6,7 +6,7 @@ interface AssetSelectorProps {
   onSelect: (asset: string) => void;
 }
 
-const AssetSelector: React.FC<AssetSelectorProps> = ({ assets, selectedAsset, onSelect }) => {
+export const AssetSelector: React.FC<AssetSelectorProps> = ({ assets, selectedAsset, onSelect }) => {
   return (
     <nav className="asset-selector">
       {assets.map(asset => (
@@ -21,5 +21,3 @@ const AssetSelector: React.FC<AssetSelectorProps> = ({ assets, selectedAsset, on
     </nav>
   );
 };
-
-export default AssetSelector;

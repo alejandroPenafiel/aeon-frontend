@@ -1,36 +1,26 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
-import AssetSelector from './components/AssetSelector';
-import AssetDashboard from './AssetDashboard';
-import { PnLSummary } from './components/PnLSummary';
-import { ConfigProvider } from './ConfigContext'; // Import ConfigProvider
-import './App.css';
-
-const defaultStrategyConfig = {
-  bang_threshold: 0.5,
-  aim_threshold: 0.5,
-  loaded_threshold: 0.5,
-  enable_trend_filter_for_entry: true,
-  enable_bollinger_filter_for_entry: true,
-  bollinger_overextended_block: false,
-};
+import type { AssetData } from './websocketTypes';
+import { AccountSummary } from './components/AccountSummary';
+import { AssetSelector } from './components/AssetSelector';
+import { AssetDetails } from './components/AssetDetails';
 
 function App() {
-  const { data: payload } = useWebSocket("ws://localhost:8000/ws/state");
+  const { accountData, assets } = useWebSocket("ws://127.0.0.1:8000/ws/state");
+
+  const availableAssets = useMemo(() => Object.keys(assets), [assets]);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
-  const vivienneClarity = payload?.data?.vivienne_clarity;
-  const artemisUserState = payload?.data?.artemis_user_state;
+  useEffect(() => {
+    if (availableAssets.length > 0 && !selectedAsset) {
+      setSelectedAsset(availableAssets[0]);
+    }
+  }, [availableAssets, selectedAsset]);
 
-  const availableAssets = useMemo(() => {
-    if (!vivienneClarity) return [];
-    return Object.keys(vivienneClarity);
-  }, [vivienneClarity]);
-
-  // Automatically select the first asset once available
-  if (!selectedAsset && availableAssets.length > 0) {
-    setSelectedAsset(availableAssets[0]);
-  }
+  const assetData: AssetData | null = useMemo(() => {
+    if (!selectedAsset || !assets[selectedAsset]) return null;
+    return assets[selectedAsset];
+  }, [assets, selectedAsset]);
 
   return (
     <div className="app-container">
@@ -43,20 +33,15 @@ function App() {
         />
       </header>
       <main className="app-main">
-        <PnLSummary data={artemisUserState} />
-        <ConfigProvider initialConfig={defaultStrategyConfig}> {/* Wrap with ConfigProvider */}
-          {selectedAsset ? (
-            <AssetDashboard
-              key={selectedAsset}
-              symbol={selectedAsset}
-              fullPayload={vivienneClarity}
-            />
-          ) : (
-            <div className="terminal-block">
-              {availableAssets.length > 0 ? 'Select an asset to view its data.' : 'Waiting for asset data...'}
-            </div>
-          )}
-        </ConfigProvider>
+        <AccountSummary accountData={accountData} />
+
+        {selectedAsset && assetData ? (
+          <AssetDetails symbol={selectedAsset} assetData={assetData} />
+        ) : (
+          <div className="terminal-block">
+            {availableAssets.length > 0 ? 'Select an asset to view its data.' : 'Waiting for asset data...'}
+          </div>
+        )}
       </main>
     </div>
   );
