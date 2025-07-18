@@ -4,6 +4,7 @@ import type { AssetData } from './websocketTypes';
 import { AccountSummary } from './components/AccountSummary';
 import { AssetSelector } from './components/AssetSelector';
 import { AssetDetails } from './components/AssetDetails';
+import { SignalsFeed } from './components/SignalsFeed';
 
 function App() {
   const { accountData, fullMessage } = useWebSocket("ws://127.0.0.1:8000/ws/state");
@@ -34,6 +35,9 @@ function App() {
       </header>
       <main className="app-main">
         <AccountSummary accountData={accountData} />
+        
+        {/* Signals Feed - Show real-time signals from all agents */}
+        <SignalsFeed fullMessage={fullMessage} selectedAsset={selectedAsset} />
 
         {selectedAsset && assetData && fullMessage ? (
           <AssetDetails symbol={selectedAsset} assetData={assetData} fullMessage={fullMessage} />

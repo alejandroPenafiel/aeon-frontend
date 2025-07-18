@@ -357,6 +357,21 @@ export interface AuroraAgentData {
   bollinger_context: BollingerContext;
   resistance_levels: ResistanceLevels;
   support_levels: SupportLevels;
+  signals?: {
+    buy?: SignalItem[];
+    sell?: SignalItem[];
+    hold?: SignalItem[];
+  };
+}
+
+export interface SignalItem {
+  time: number;
+  type: string; // More generic to accommodate new signal names
+  strength: 'strong' | 'medium' | 'weak';
+  signal_type?: string; // e.g., "BULLISH", "LONG"
+  confidence?: number;
+  price?: number;
+  direction?: string; // e.g., "LONG"
 }
 
 export interface CandleItem {
