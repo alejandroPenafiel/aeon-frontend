@@ -3,13 +3,13 @@ import type { AccountData, AssetData, WebSocketData } from '../websocketTypes';
 
 interface CleanedData {
   accountData: AccountData | null;
-  assets: Record<string, AssetData>;
+  fullMessage: WebSocketData | null; // Store the full message
 }
 
 export function useWebSocket(url: string) {
   const [cleanedData, setCleanedData] = useState<CleanedData>({
     accountData: null,
-    assets: {},
+    fullMessage: null,
   });
 
   const processMessage = useCallback((message: any) => {
@@ -19,7 +19,7 @@ export function useWebSocket(url: string) {
 
     setCleanedData({
       accountData: accountData,
-      assets: assets,
+      fullMessage: message, // Store the full message
     });
   }, []);
 

@@ -1,7 +1,7 @@
 export interface WebSocketData {
+  type: string;
   account_data?: AccountData;
-  BTC?: AssetData;
-  // Add other assets as needed
+  data: Record<string, AssetData>;
 }
 
 export interface AccountData {
@@ -37,6 +37,7 @@ export interface Agents {
   VivienneAgent?: VivienneAgent;
   TempestAgent?: TempestAgent;
   VesperAgent?: VesperAgent;
+  AuroraAgent?: AuroraAgent;
 }
 
 export interface OctaviaAgent {
@@ -55,17 +56,17 @@ export interface OctaviaAgentData {
 export interface Indicators {
   ts: number | null;
   asset_id: number;
-  ema_3: number;
-  ema_5: number;
-  ema_21: number;
-  ema_30: number;
-  rsi: number;
-  macd: number;
-  macd_signal: number;
-  macd_histogram: number;
-  bb_upper: number;
-  bb_middle: number;
-  bb_lower: number;
+  ema_3: PriceHistoryItem[];
+  ema_5: PriceHistoryItem[];
+  ema_21: PriceHistoryItem[];
+  ema_30: PriceHistoryItem[];
+  rsi: PriceHistoryItem[];
+  macd: PriceHistoryItem[];
+  macd_signal: PriceHistoryItem[];
+  macd_histogram: PriceHistoryItem[];
+  bb_upper: PriceHistoryItem[];
+  bb_middle: PriceHistoryItem[];
+  bb_lower: PriceHistoryItem[];
   atr: number;
 }
 
@@ -342,4 +343,36 @@ export interface VesperAgent {
     position: null;
   };
   config: {};
+}
+
+export interface AuroraAgent {
+  data: AuroraAgentData;
+  config: AuroraAgentConfig;
+}
+
+export interface AuroraAgentData {
+  candles: CandleItem[];
+  indicators: Indicators;
+  macd_trend: MacdTrend;
+  bollinger_context: BollingerContext;
+  resistance_levels: ResistanceLevels;
+  support_levels: SupportLevels;
+}
+
+export interface CandleItem {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface PriceHistoryItem {
+  time: number;
+  value: { time: number; value: number; };
+}
+
+export interface AuroraAgentConfig {
+  // Add any specific config for AuroraAgent if available
 }

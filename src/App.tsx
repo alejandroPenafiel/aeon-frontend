@@ -6,9 +6,9 @@ import { AssetSelector } from './components/AssetSelector';
 import { AssetDetails } from './components/AssetDetails';
 
 function App() {
-  const { accountData, assets } = useWebSocket("ws://127.0.0.1:8000/ws/state");
+  const { accountData, fullMessage } = useWebSocket("ws://127.0.0.1:8000/ws/state");
 
-  const availableAssets = useMemo(() => Object.keys(assets), [assets]);
+  const availableAssets = useMemo(() => fullMessage?.data ? Object.keys(fullMessage.data) : [], [fullMessage]);
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,9 +18,9 @@ function App() {
   }, [availableAssets, selectedAsset]);
 
   const assetData: AssetData | null = useMemo(() => {
-    if (!selectedAsset || !assets[selectedAsset]) return null;
-    return assets[selectedAsset];
-  }, [assets, selectedAsset]);
+    if (!selectedAsset || !fullMessage?.data?.[selectedAsset]) return null;
+    return fullMessage.data[selectedAsset];
+  }, [fullMessage, selectedAsset]);
 
   return (
     <div className="app-container">
@@ -35,8 +35,8 @@ function App() {
       <main className="app-main">
         <AccountSummary accountData={accountData} />
 
-        {selectedAsset && assetData ? (
-          <AssetDetails symbol={selectedAsset} assetData={assetData} />
+        {selectedAsset && assetData && fullMessage ? (
+          <AssetDetails symbol={selectedAsset} assetData={assetData} fullMessage={fullMessage} />
         ) : (
           <div className="terminal-block">
             {availableAssets.length > 0 ? 'Select an asset to view its data.' : 'Waiting for asset data...'}
