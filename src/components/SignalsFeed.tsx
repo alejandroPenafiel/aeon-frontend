@@ -13,7 +13,8 @@ interface SignalEvent {
   signal: string;
   confidence: number;
   details: string;
-  type: 'buy' | 'sell' | 'hold' | 'info';
+  type: 'buy' | 'sell' | 'hold' | 'info' | 'state';
+  priority: 'high' | 'medium' | 'low';
 }
 
 export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedAsset }) => {
@@ -46,7 +47,8 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
             signal: signalDetails.signal,
             confidence: signalDetails.confidence,
             details: signalDetails.details,
-            type: signalType
+            type: signalType,
+            priority: signalDetails.confidence > 0.7 ? 'medium' : 'low'
           });
         }
       });
@@ -65,24 +67,30 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
             signal: signal.name,
             confidence: signal.confidence,
             details: signal.details,
-            type: signalType
+            type: signalType,
+            priority: signal.confidence > 0.7 ? 'medium' : 'low'
           });
         }
       });
     }
 
-    // Process Vivienne recommendation
+    // Process Vivienne recommendation - Make this more prominent
     if (vivienneData?.recommendation?.state && vivienneData.recommendation.state !== 'IDLE') {
       console.log('Vivienne recommendation found:', vivienneData.recommendation);
+      const state = vivienneData.recommendation.state.toLowerCase();
+      const isBang = state === 'bang';
+      const isAim = state === 'aim';
+      const isLoaded = state === 'loaded';
+      
       newSignals.push({
         id: `vivienne-recommendation-${timestamp}`,
         timestamp,
         agent: 'Vivienne',
-        signal: `RECOMMENDATION: ${vivienneData.recommendation.state}`,
+        signal: `🚨 ${vivienneData.recommendation.state.toUpperCase()} 🚨`,
         confidence: vivienneData.recommendation.total_weighted_confidence,
         details: vivienneData.recommendation.reasoning,
-        type: vivienneData.recommendation.state.includes('BANG') ? 'buy' : 
-              vivienneData.recommendation.state.includes('SHORT') ? 'sell' : 'hold'
+        type: 'state',
+        priority: isBang ? 'high' : isAim ? 'medium' : 'low'
       });
     } else {
       console.log('Vivienne recommendation check:', {
@@ -98,7 +106,18 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
     }
   }, [fullMessage, selectedAsset]);
 
-  const getSignalColor = (type: string) => {
+  const getSignalColor = (type: string, priority: string) => {
+    // Special styling for state signals
+    if (type === 'state') {
+      switch (priority) {
+        case 'high': return 'signal-high-priority';
+        case 'medium': return 'signal-medium-priority';
+        case 'low': return 'text-yellow-400 border-yellow-500 bg-yellow-900 bg-opacity-20';
+        default: return 'text-blue-400 border-blue-500 bg-blue-900 bg-opacity-20';
+      }
+    }
+    
+    // Regular signal styling
     switch (type) {
       case 'buy': return 'text-green-400 border-green-500';
       case 'sell': return 'text-red-400 border-red-500';
@@ -115,6 +134,18 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
     }
   };
 
+  const getPriorityIcon = (priority: string, type: string) => {
+    if (type === 'state') {
+      switch (priority) {
+        case 'high': return '🚨';
+        case 'medium': return '🎯';
+        case 'low': return '⚡';
+        default: return '📊';
+      }
+    }
+    return '';
+  };
+
   return (
     <div className="terminal-block mb-4">
       <div className="title-bar">SIGNALS FEED</div>
@@ -128,13 +159,18 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
             {signals.map((signal) => (
               <div 
                 key={signal.id} 
-                className={`bg-gray-800 p-3 rounded border-l-4 ${getSignalColor(signal.type)}`}
+                className={`bg-gray-800 p-3 rounded border-l-4 transition-all duration-300 ${
+                  getSignalColor(signal.type, signal.priority)
+                } ${signal.priority === 'high' ? 'ring-2 ring-red-400 ring-opacity-50 animate-pulse' : ''}`}
               >
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex items-center space-x-2">
                     <span className={`font-semibold text-sm ${getAgentColor(signal.agent)}`}>
                       {signal.agent}
                     </span>
+                    {getPriorityIcon(signal.priority, signal.type) && (
+                      <span className="text-lg">{getPriorityIcon(signal.priority, signal.type)}</span>
+                    )}
                     <span className="text-xs text-gray-500">
                       {new Date(signal.timestamp).toLocaleTimeString()}
                     </span>
@@ -143,7 +179,7 @@ export const SignalsFeed: React.FC<SignalsFeedProps> = ({ fullMessage, selectedA
                     {Math.round(signal.confidence * 100)}%
                   </span>
                 </div>
-                <div className="font-mono text-sm mb-1">
+                <div className={`font-mono text-sm mb-1 ${signal.type === 'state' ? 'font-bold text-lg' : ''}`}>
                   {signal.signal}
                 </div>
                 <div className="text-xs text-gray-400">

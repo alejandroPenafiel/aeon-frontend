@@ -115,3 +115,173 @@ table.terminal-body td:nth-child(1) {
 .save-button:hover {
   background-color: #008f00;
 }
+
+/* Custom animations for agent states */
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.4);
+  }
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 5px rgba(249, 115, 22, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.8), 0 0 30px rgba(249, 115, 22, 0.4);
+  }
+}
+
+@keyframes pulse-yellow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 5px rgba(234, 179, 8, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 20px rgba(234, 179, 8, 0.8), 0 0 30px rgba(234, 179, 8, 0.4);
+  }
+}
+
+/* Enhanced state styling */
+.state-bang {
+  animation: pulse-red 2s infinite;
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 50%, #dc2626 100%);
+  border: 2px solid #ef4444;
+  color: white;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+.state-aim {
+  animation: pulse-orange 3s infinite;
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #ea580c 100%);
+  border: 2px solid #f97316;
+  color: white;
+  text-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+}
+
+.state-loaded {
+  animation: pulse-yellow 4s infinite;
+  background: linear-gradient(135deg, #713f12 0%, #854d0e 50%, #ca8a04 100%);
+  border: 2px solid #eab308;
+  color: black;
+  text-shadow: 0 0 10px rgba(234, 179, 8, 0.8);
+}
+
+/* High priority signal styling */
+.signal-high-priority {
+  animation: pulse-red 1.5s infinite;
+  background: rgba(127, 29, 29, 0.3);
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+}
+
+.signal-medium-priority {
+  background: rgba(124, 45, 18, 0.3);
+  border: 2px solid #f97316;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.3);
+}
+
+/* Agent status panel enhancements */
+.agent-status-high {
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+  border: 2px solid #ef4444;
+  color: white;
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.8);
+  animation: pulse-red 2s infinite;
+}
+
+.agent-status-medium {
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 100%);
+  border: 2px solid #f97316;
+  color: white;
+  text-shadow: 0 0 5px rgba(249, 115, 22, 0.8);
+}
+
+.agent-status-low {
+  background: #374151;
+  border: 2px solid #6b7280;
+  color: #d1d5db;
+}
+
+/* Banner styling for important states */
+.banner-bang {
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 50%, #dc2626 100%);
+  border: 3px solid #ef4444;
+  color: white;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+  animation: pulse-red 2s infinite;
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+}
+
+.banner-aim {
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #ea580c 100%);
+  border: 3px solid #f97316;
+  color: white;
+  text-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+}
+
+/* Chaos Data Items */
+.chaos-data-item {
+  @apply p-3 bg-black bg-opacity-20 rounded border border-gray-700;
+}
+
+.chaos-label {
+  @apply text-xs text-gray-400 mb-1 font-mono;
+}
+
+.chaos-value {
+  @apply text-lg font-bold font-mono;
+}
+
+/* State-specific styling */
+.state-bang {
+  @apply bg-red-900 bg-opacity-30 border-red-500 text-white;
+  animation: pulse-red 2s infinite;
+}
+
+.state-aim {
+  @apply bg-orange-900 bg-opacity-30 border-orange-500 text-white;
+  animation: pulse-orange 2s infinite;
+}
+
+.state-loaded {
+  @apply bg-yellow-900 bg-opacity-30 border-yellow-500 text-black;
+  animation: pulse-yellow 2s infinite;
+}
+
+/* Pulse animations */
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+  }
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(249, 115, 22, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.8);
+  }
+}
+
+@keyframes pulse-yellow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(234, 179, 8, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(234, 179, 8, 0.8);
+  }
+}

@@ -121,31 +121,7 @@ export const AgathaAgent: React.FC<AgathaAgentProps> = ({ data }) => {
           </div>
         </div>
 
-        {/* Support/Resistance Levels */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="font-semibold text-green-400 mb-2">Support Levels</h4>
-            <div className="bg-gray-800 p-2 rounded text-sm">
-              <div className="font-mono text-green-400">
-                Significant: {indicators?.significant_support?.toFixed(4) || 'N/A'}
-              </div>
-              <div className="text-gray-400 text-xs mt-1">
-                Levels: {indicators?.support_levels?.map(level => level.toFixed(4)).join(', ') || 'None'}
-              </div>
-            </div>
-          </div>
-          <div>
-            <h4 className="font-semibold text-green-400 mb-2">Resistance Levels</h4>
-            <div className="bg-gray-800 p-2 rounded text-sm">
-              <div className="font-mono text-red-400">
-                Significant: {indicators?.significant_resistance?.toFixed(4) || 'N/A'}
-              </div>
-              <div className="text-gray-400 text-xs mt-1">
-                Levels: {indicators?.resistance_levels?.map(level => level.toFixed(4)).join(', ') || 'None'}
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
   );

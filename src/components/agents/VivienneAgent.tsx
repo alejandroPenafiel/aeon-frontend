@@ -6,7 +6,7 @@ interface VivienneAgentProps {
 }
 
 export const VivienneAgent: React.FC<VivienneAgentProps> = ({ data }) => {
-  const { signals, summary, recommendation, macd_trend_direction, chaos_discerned } = data.data;
+  const { chaos_discerned } = data.data;
   
   if (!data.data) {
     return (
@@ -19,185 +19,197 @@ export const VivienneAgent: React.FC<VivienneAgentProps> = ({ data }) => {
     );
   }
 
-  // Helper function to get signal color based on bullish/bearish
-  const getSignalColor = (isBullish: boolean | null) => {
-    if (isBullish === true) return 'text-green-400';
-    if (isBullish === false) return 'text-red-400';
-    return 'text-yellow-400';
+  if (!chaos_discerned) {
+    return (
+      <div className="terminal-block mb-4">
+        <div className="title-bar">VivienneAgent - Chaos Analysis</div>
+        <div className="p-4 text-yellow-400">
+          No chaos discerned data available. Waiting for analysis...
+        </div>
+      </div>
+    );
+  }
+
+  const chaos = chaos_discerned;
+  const state = chaos.state || 'idle';
+
+  // Helper function to get state styling
+  const getStateStyling = (state: string) => {
+    const stateLower = state.toLowerCase();
+    switch (stateLower) {
+      case 'bang':
+        return {
+          bgColor: 'state-bang',
+          textColor: 'text-white',
+          borderColor: 'border-red-500',
+          icon: '🚨',
+          title: 'CHAOS ANALYSIS - BANG'
+        };
+      case 'aim':
+        return {
+          bgColor: 'state-aim',
+          textColor: 'text-white',
+          borderColor: 'border-orange-500',
+          icon: '🎯',
+          title: 'CHAOS ANALYSIS - AIM'
+        };
+      case 'loaded':
+        return {
+          bgColor: 'state-loaded',
+          textColor: 'text-black',
+          borderColor: 'border-yellow-500',
+          icon: '⚡',
+          title: 'CHAOS ANALYSIS - LOADED'
+        };
+      default:
+        return {
+          bgColor: 'bg-gray-800 bg-opacity-30',
+          textColor: 'text-gray-300',
+          borderColor: 'border-gray-600',
+          icon: '🌀',
+          title: 'CHAOS ANALYSIS - IDLE'
+        };
+    }
   };
 
-  // Helper function to get confidence color
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-400';
-    if (confidence >= 0.6) return 'text-yellow-400';
-    return 'text-red-400';
-  };
-
-  // Helper function to get sentiment color
-  const getSentimentColor = (sentiment: string) => {
-    if (sentiment.includes('BULLISH') || sentiment.includes('LONG')) return 'text-green-400';
-    if (sentiment.includes('BEARISH') || sentiment.includes('SHORT')) return 'text-red-400';
-    return 'text-yellow-400';
-  };
+  const styling = getStateStyling(state);
 
   return (
     <div className="terminal-block mb-4">
-      <div className="title-bar">VivienneAgent</div>
-      
-      {/* Debug Section */}
-      <div className="p-2 bg-gray-900 border-b border-gray-600">
-        <details className="text-xs" open>
-          <summary className="text-yellow-400 cursor-pointer">Debug: Raw Vivienne Data</summary>
-          <div className="mt-2 space-y-1">
-            <div>Has signals: {signals ? signals.length : 0}</div>
-            <div>Has summary: {summary ? 'Yes' : 'No'}</div>
-            <div>Has recommendation: {recommendation ? 'Yes' : 'No'}</div>
-            <div>Recommendation state: {recommendation?.state || 'N/A'}</div>
-            <div>MACD trend: {macd_trend_direction || 'N/A'}</div>
-            <div>Raw data: {JSON.stringify(data.data, null, 2)}</div>
-          </div>
-        </details>
+      <div className={`title-bar ${styling.bgColor} ${styling.textColor} ${styling.borderColor}`}>
+        <span className="mr-2">{styling.icon}</span>
+        {styling.title}
       </div>
       
-      <div className="p-4 space-y-4">
-        {/* MACD Trend Direction */}
-        <div>
-          <h4 className="font-semibold text-green-400 mb-2">MACD Trend</h4>
-          <div className="bg-gray-800 p-2 rounded text-sm">
-            <span className={`font-mono ${macd_trend_direction === 'BULLISH' ? 'text-green-400' : 'text-red-400'}`}>
-              {macd_trend_direction || 'N/A'}
-            </span>
+      <div className="p-4">
+        {/* Primary Chaos Data - The 4 key fields you requested */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Position Type */}
+          <div className="chaos-data-item">
+            <div className="chaos-label">Position Type</div>
+            <div className={`chaos-value ${chaos.position_type === 'LONG' ? 'text-green-400' : chaos.position_type === 'SHORT' ? 'text-red-400' : 'text-yellow-400'}`}>
+              {chaos.position_type || 'NONE'}
+            </div>
+          </div>
+
+          {/* Sentiment */}
+          <div className="chaos-data-item">
+            <div className="chaos-label">Sentiment</div>
+            <div className={`chaos-value ${chaos.sentiment === 'BULLISH' ? 'text-green-400' : chaos.sentiment === 'BEARISH' ? 'text-red-400' : 'text-yellow-400'}`}>
+              {chaos.sentiment || 'NEUTRAL'}
+            </div>
+          </div>
+
+          {/* Confidence */}
+          <div className="chaos-data-item">
+            <div className="chaos-label">Confidence</div>
+            <div className="chaos-value text-blue-400">
+              {chaos.total_weighted_confidence ? `${chaos.total_weighted_confidence.toFixed(2)}%` : '0.00%'}
+            </div>
+          </div>
+
+          {/* Size */}
+          <div className="chaos-data-item">
+            <div className="chaos-label">Size</div>
+            <div className="chaos-value text-purple-400">
+              {chaos.position_size ? `${chaos.position_size}%` : '0%'}
+            </div>
           </div>
         </div>
 
-        {/* Summary */}
-        {summary && (
-          <div>
-            <h4 className="font-semibold text-green-400 mb-2">Signal Summary</h4>
-            <div className="bg-gray-800 p-3 rounded space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Sentiment:</span>
-                <span className={`font-mono ${getSentimentColor(summary.sentiment)}`}>
-                  {summary.sentiment}
-                </span>
+        {/* Detailed Chaos Analysis */}
+        <div className="space-y-4">
+          {/* State and Signal Information */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="chaos-data-item">
+              <div className="chaos-label">State</div>
+              <div className={`chaos-value ${styling.textColor}`}>
+                {chaos.state || 'idle'}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Confidence:</span>
-                <span className={`font-mono ${getConfidenceColor(summary.confidence)}`}>
-                  {Math.round(summary.confidence * 100)}%
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-gray-400">Long Signals:</span>
-                  <span className="font-mono text-green-400 ml-1">{summary.long_signals}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Short Signals:</span>
-                  <span className="font-mono text-red-400 ml-1">{summary.short_signals}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Valid Long:</span>
-                  <span className="font-mono text-green-400 ml-1">{summary.valid_long_signals}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Valid Short:</span>
-                  <span className="font-mono text-red-400 ml-1">{summary.valid_short_signals}</span>
-                </div>
+            </div>
+            <div className="chaos-data-item">
+              <div className="chaos-label">Valid Signals</div>
+              <div className="chaos-value text-cyan-400">
+                {chaos.num_valid_signals || 0}
               </div>
             </div>
           </div>
-        )}
 
-        {/* Recommendation */}
-        {recommendation && (
-          <div>
-            <h4 className="font-semibold text-green-400 mb-2">Recommendation</h4>
-            <div className="bg-gray-800 p-3 rounded space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">State:</span>
-                <span className={`font-mono ${getSentimentColor(recommendation.state)}`}>
-                  {recommendation.state}
-                </span>
+          {/* Weight Analysis */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="chaos-data-item">
+              <div className="chaos-label">Long Weight</div>
+              <div className="chaos-value text-green-400">
+                {chaos.long_total_weight ? chaos.long_total_weight.toFixed(2) : '0.00'}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Position Type:</span>
-                <span className={`font-mono ${getSentimentColor(recommendation.position_type)}`}>
-                  {recommendation.position_type}
-                </span>
+            </div>
+            <div className="chaos-data-item">
+              <div className="chaos-label">Short Weight</div>
+              <div className="chaos-value text-red-400">
+                {chaos.short_total_weight ? chaos.short_total_weight.toFixed(2) : '0.00'}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Position Size:</span>
-                <span className="font-mono text-blue-400">{recommendation.position_size}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Confidence:</span>
-                <span className={`font-mono ${getConfidenceColor(recommendation.total_weighted_confidence)}`}>
-                  {Math.round(recommendation.total_weighted_confidence * 100)}%
-                </span>
-              </div>
-              <div className="text-xs text-gray-400 mt-2">
-                <div className="font-semibold mb-1">Reasoning:</div>
-                <div className="text-gray-300">{recommendation.reasoning}</div>
+            </div>
+            <div className="chaos-data-item">
+              <div className="chaos-label">Total Weight</div>
+              <div className="chaos-value text-blue-400">
+                {chaos.total_adjusted_weight ? chaos.total_adjusted_weight.toFixed(2) : '0.00'}
               </div>
             </div>
           </div>
-        )}
 
-        {/* Active Signals */}
-        <div>
-          <h4 className="font-semibold text-green-400 mb-2">Active Signals</h4>
-          <div className="space-y-2">
-            {signals && signals.length > 0 ? (
-              signals.map((signal, index) => (
-                <div key={index} className="bg-gray-800 p-3 rounded border-l-4 border-gray-600">
-                  <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-semibold text-blue-400 text-sm">{signal.name}</h5>
-                    <div className="flex space-x-2">
-                      <span className={`text-xs px-2 py-1 rounded ${getConfidenceColor(signal.confidence)}`}>
-                        {Math.round(signal.confidence * 100)}%
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded bg-gray-700">
-                        W: {signal.weight}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className={`font-mono ${getSignalColor(signal.is_bullish)}`}>
-                      Direction: {signal.is_bullish === true ? 'BULLISH' : signal.is_bullish === false ? 'BEARISH' : 'NEUTRAL'}
-                    </div>
-                    <div className="text-gray-400">
-                      {signal.details}
-                    </div>
-                    <div className="text-gray-500">
-                      Category: {signal.category}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-gray-800 p-3 rounded text-center text-yellow-400 text-sm">
-                No active signals detected. Waiting for signal conditions...
+          {/* Confidence Breakdown */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="chaos-data-item">
+              <div className="chaos-label">Long Confidence</div>
+              <div className="chaos-value text-green-400">
+                {chaos.long_weighted_confidence ? `${chaos.long_weighted_confidence.toFixed(2)}%` : '0.00%'}
               </div>
-            )}
+            </div>
+            <div className="chaos-data-item">
+              <div className="chaos-label">Short Confidence</div>
+              <div className="chaos-value text-red-400">
+                {chaos.short_weighted_confidence ? `${chaos.short_weighted_confidence.toFixed(2)}%` : '0.00%'}
+              </div>
+            </div>
+            <div className="chaos-data-item">
+              <div className="chaos-label">Average Confidence</div>
+              <div className="chaos-value text-yellow-400">
+                {chaos.average_confidence ? `${chaos.average_confidence.toFixed(2)}%` : '0.00%'}
+              </div>
+            </div>
           </div>
+
+          {/* Signal Sorting */}
+          {chaos.sorting_signals && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="chaos-data-item">
+                <div className="chaos-label">Long Signals</div>
+                <div className="chaos-value text-green-400">
+                  {chaos.sorting_signals.long?.length || 0}
+                </div>
+              </div>
+              <div className="chaos-data-item">
+                <div className="chaos-label">Short Signals</div>
+                <div className="chaos-value text-red-400">
+                  {chaos.sorting_signals.short?.length || 0}
+                </div>
+              </div>
+              <div className="chaos-data-item">
+                <div className="chaos-label">Neutral Signals</div>
+                <div className="chaos-value text-yellow-400">
+                  {chaos.sorting_signals.neutral?.length || 0}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Chaos Discerned (if available) */}
-        {chaos_discerned && (
-          <div>
-            <h4 className="font-semibold text-green-400 mb-2">Chaos Analysis</h4>
-            <div className="bg-gray-800 p-3 rounded space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Sentiment:</span>
-                <span className={`font-mono ${getSentimentColor(chaos_discerned.sentiment)}`}>
-                  {chaos_discerned.sentiment}
-                </span>
-              </div>
-              <div className="text-xs text-gray-400">
-                <div className="font-semibold mb-1">Reasoning:</div>
-                <div className="text-gray-300">{chaos_discerned.reasoning}</div>
-              </div>
+        {/* Reasoning */}
+        {chaos.reasoning && (
+          <div className="mt-6 p-4 bg-black bg-opacity-30 rounded border border-gray-700">
+            <div className="text-sm text-gray-400 mb-2 font-bold">Chaos Analysis Reasoning:</div>
+            <div className="text-xs text-gray-300 font-mono leading-relaxed">
+              {chaos.reasoning}
             </div>
           </div>
         )}

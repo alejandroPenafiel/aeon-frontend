@@ -237,6 +237,8 @@ export interface VivienneAgentData {
   recommendation: Recommendation;
   macd_trend_direction: string;
   chaos_discerned: Recommendation; // Reusing Recommendation interface as structure is similar
+  latest_trend_filter_blocked?: TrendFilterBlocked;
+  latest_volatility_filter_blocked?: VolatilityFilterBlocked;
 }
 
 export interface Signal {
@@ -390,4 +392,24 @@ export interface PriceHistoryItem {
 
 export interface AuroraAgentConfig {
   // Add any specific config for AuroraAgent if available
+}
+
+export interface TrendFilterBlocked {
+  asset: string;
+  action: string;
+  block_reason: string;
+  size_percentage: number;
+  triggering_state: string;
+  reasoning_summary: string;
+  macd_trend_direction: string;
+}
+
+export interface VolatilityFilterBlocked {
+  asset: string;
+  action: string;
+  bb_bandwidth: number;
+  block_reasons: string[];
+  size_percentage: number;
+  triggering_state: string;
+  reasoning_summary: string;
 }
