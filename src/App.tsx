@@ -1,16 +1,21 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useWebSocket } from './hooks/useWebSocket';
-import type { AssetData } from './websocketTypes';
-import { AccountSummary } from './components/AccountSummary';
-import { AssetSelector } from './components/AssetSelector';
-import { AssetDetails } from './components/AssetDetails';
-import { SignalsFeed } from './components/SignalsFeed';
-import { AgentStatusPanel } from './components/AgentStatusPanel';
+import React, { useState, useMemo, useEffect } from "react";
+import { useWebSocket } from "./hooks/useWebSocket";
+import type { AssetData } from "./websocketTypes";
+import { AccountSummary } from "./components/AccountSummary";
+import { AssetSelector } from "./components/AssetSelector";
+import { AssetDetails } from "./components/AssetDetails";
+import { SignalsFeed } from "./components/SignalsFeed";
+import AgentStatusPanel from "./components/AgentStatusPanel";
 
 function App() {
-  const { accountData, fullMessage } = useWebSocket("ws://127.0.0.1:8000/ws/state");
+  const { accountData, fullMessage } = useWebSocket(
+    "ws://127.0.0.1:8000/ws/state",
+  );
 
-  const availableAssets = useMemo(() => fullMessage?.data ? Object.keys(fullMessage.data) : [], [fullMessage]);
+  const availableAssets = useMemo(
+    () => (fullMessage?.data ? Object.keys(fullMessage.data) : []),
+    [fullMessage],
+  );
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,8 +34,12 @@ function App() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-green-400 mb-2">AEON TRADING DASHBOARD</h1>
-          <p className="text-gray-400">Real-time agent monitoring and signal analysis</p>
+          <h1 className="text-3xl font-bold text-green-400 mb-2">
+            AEON TRADING DASHBOARD
+          </h1>
+          <p className="text-gray-400">
+            Real-time agent monitoring and signal analysis
+          </p>
         </div>
 
         {/* Account Summary */}
@@ -44,22 +53,22 @@ function App() {
         />
 
         {/* Agent Status Panel */}
-        <AgentStatusPanel 
-          assetData={selectedAssetData} 
-          selectedAsset={selectedAsset} 
+        <AgentStatusPanel
+          assetData={selectedAssetData}
+          selectedAsset={selectedAsset}
         />
 
-        {/* Signals Feed */}
-        <SignalsFeed 
+        {/* Signals Feed - Hidden per user request */}
+        {/* <SignalsFeed 
           fullMessage={fullMessage} 
           selectedAsset={selectedAsset} 
-        />
+        /> */}
 
         {/* Asset Details */}
         {selectedAssetData && selectedAsset && fullMessage && (
-          <AssetDetails 
-            assetData={selectedAssetData} 
-            symbol={selectedAsset} 
+          <AssetDetails
+            assetData={selectedAssetData}
+            symbol={selectedAsset}
             fullMessage={fullMessage}
           />
         )}
