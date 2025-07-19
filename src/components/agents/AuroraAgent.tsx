@@ -29,7 +29,10 @@ const AuroraChart: React.FC<{
   resistanceLevel: number | null;
   historicalSupportLevels: number[];
   historicalResistanceLevels: number[];
-}> = React.memo(({ chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel, historicalSupportLevels, historicalResistanceLevels }) => {
+  allSignalTypes: string[];
+  signalCounts: { [key: string]: number };
+  signalCategories: { buy: string[]; sell: string[]; neutral: string[] };
+}> = React.memo(({ chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel, historicalSupportLevels, historicalResistanceLevels, allSignalTypes, signalCounts, signalCategories }) => {
   // State to track which lines are visible (dimmed or bright)
   const [visibleLines, setVisibleLines] = useState({
     close: true,
@@ -95,44 +98,77 @@ const AuroraChart: React.FC<{
 
         {/* Signal legend items */}
         <div className="flex items-center gap-4 ml-4 border-l border-gray-600 pl-4">
-          {/* Buy Signals */}
-          <div
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setVisibleSignals(prev => ({ ...prev, buy: !prev.buy }))}
-            style={{ opacity: visibleSignals.buy ? 1 : 0.3 }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16">
-              <circle cx="8" cy="8" r="6" fill="#22c55e" stroke="#16a34a" strokeWidth="1" />
-              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">B</text>
-            </svg>
-            <span className="text-xs text-gray-300">Buy</span>
-          </div>
+          {/* Buy Signal Types */}
+          {signalCategories.buy.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-400 font-semibold">Buy Signals:</span>
+              {signalCategories.buy.map((signalType, index) => {
+                const isVisible = visibleSignals.buy;
+                const count = signalCounts[signalType] || 0;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setVisibleSignals(prev => ({ ...prev, buy: !prev.buy }))}
+                    style={{ opacity: isVisible ? 1 : 0.3 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                      <circle cx="6" cy="6" r="5" fill="#22c55e" stroke="#16a34a" strokeWidth="1" />
+                    </svg>
+                    <span className="text-xs text-gray-300">{signalType} ({count})</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Sell Signals */}
-          <div
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setVisibleSignals(prev => ({ ...prev, sell: !prev.sell }))}
-            style={{ opacity: visibleSignals.sell ? 1 : 0.3 }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16">
-              <circle cx="8" cy="8" r="6" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
-              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">S</text>
-            </svg>
-            <span className="text-xs text-gray-300">Sell</span>
-          </div>
+          {/* Sell Signal Types */}
+          {signalCategories.sell.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-400 font-semibold">Sell Signals:</span>
+              {signalCategories.sell.map((signalType, index) => {
+                const isVisible = visibleSignals.sell;
+                const count = signalCounts[signalType] || 0;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setVisibleSignals(prev => ({ ...prev, sell: !prev.sell }))}
+                    style={{ opacity: isVisible ? 1 : 0.3 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                      <circle cx="6" cy="6" r="5" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
+                    </svg>
+                    <span className="text-xs text-gray-300">{signalType} ({count})</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Neutral/Validate Signals */}
-          <div
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setVisibleSignals(prev => ({ ...prev, neutral: !prev.neutral }))}
-            style={{ opacity: visibleSignals.neutral ? 1 : 0.3 }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16">
-              <circle cx="8" cy="8" r="6" fill="#60a5fa" stroke="#3b82f6" strokeWidth="1" />
-              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">V</text>
-            </svg>
-            <span className="text-xs text-gray-300">Validate</span>
-          </div>
+          {/* Neutral Signal Types */}
+          {signalCategories.neutral.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-400 font-semibold">Neutral Signals:</span>
+              {signalCategories.neutral.map((signalType, index) => {
+                const isVisible = visibleSignals.neutral;
+                const count = signalCounts[signalType] || 0;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setVisibleSignals(prev => ({ ...prev, neutral: !prev.neutral }))}
+                    style={{ opacity: isVisible ? 1 : 0.3 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                      <circle cx="6" cy="6" r="5" fill="#60a5fa" stroke="#3b82f6" strokeWidth="1" />
+                    </svg>
+                    <span className="text-xs text-gray-300">{signalType} ({count})</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Signal Count */}
           <div className="text-xs text-gray-400 ml-2">
@@ -153,51 +189,41 @@ const AuroraChart: React.FC<{
 
     let fill = '#a1a1aa'; // Default color (zinc-500)
     let stroke = '#e4e4e7'; // zinc-200
-    let text = '';
-    let mappedType = type; // Use the original type as a fallback
     let signalCategory = 'neutral'; // Default category
 
-    // Map new signal types/directions to 'buy', 'sell', 'hold' for consistent coloring
-    if (signal_type === 'BULLISH' || direction === 'LONG') {
-      mappedType = 'buy';
+    // Use the same improved categorization logic as the legend
+    if (signal_type === 'BULLISH' || direction === 'LONG' || signal_type === 'BUY') {
       signalCategory = 'buy';
-    } else if (signal_type === 'BEARISH' || direction === 'SHORT') {
-      mappedType = 'sell';
+    } else if (signal_type === 'BEARISH' || direction === 'SHORT' || signal_type === 'SELL') {
       signalCategory = 'sell';
-    } else if (type.includes('hold')) { // Check if original type contains 'hold'
-      mappedType = 'hold';
+    } else {
       signalCategory = 'neutral';
     }
+
+    console.log(`AuroraAgent - SignalDot categorization: type="${type}", signal_type="${signal_type}", direction="${direction}" -> category="${signalCategory}"`);
 
     // Check if this signal type should be visible
     if (!visibleSignals[signalCategory as keyof typeof visibleSignals]) {
       return null;
     }
 
-    if (mappedType === 'buy') {
+    if (signalCategory === 'buy') {
       fill = strength === 'strong' ? '#22c55e' : '#86efac'; // green-500, green-300
       stroke = '#16a34a'; // green-600
-      text = 'B';
-    } else if (mappedType === 'sell') {
+    } else if (signalCategory === 'sell') {
       fill = strength === 'strong' ? '#ef4444' : '#fca5a5'; // red-500, red-300
       stroke = '#dc2626'; // red-600
-      text = 'S';
-    } else if (mappedType === 'hold') {
-      fill = '#71717a'; // zinc-500
-      stroke = '#52525b'; // zinc-600
-      text = 'H';
-    } else { // For other new signal types, use a generic color and the first letter of the type
+    } else { // neutral
       fill = '#60a5fa'; // blue-400
       stroke = '#3b82f6'; // blue-500
-      text = type.charAt(0).toUpperCase(); // Use first letter of the signal type
     }
+
+    // Make dots smaller - reduce radius from 10/7 to 4/3
+    const radius = strength === 'strong' ? 4 : 3;
 
     return (
       <g>
-        <circle cx={cx} cy={cy} r={strength === 'strong' ? 8 : 5} fill={fill} stroke={stroke} strokeWidth={1} />
-        <text x={cx} y={cy} dy=".3em" textAnchor="middle" fontSize={strength === 'strong' ? 9 : 7} fill="#ffffff" fontWeight="bold">
-          {text}
-        </text>
+        <circle cx={cx} cy={cy} r={radius} fill={fill} stroke={stroke} strokeWidth={1} />
       </g>
     );
   };
@@ -1044,6 +1070,169 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     };
   }, [fullMessage, assetSymbol, forceUpdate]); // Added forceUpdate to dependency array
 
+  // Collect all unique signal types from the fullMessage
+  const allSignalTypes = useMemo(() => {
+    const types = new Set<string>();
+    const typeDetails: { [key: string]: any[] } = {};
+    
+    const auroraAgentData = fullMessage?.data?.[assetSymbol]?.agents?.AuroraAgent?.data;
+    
+    if (auroraAgentData?.signals) {
+      if (Array.isArray(auroraAgentData.signals)) {
+        // New flat array structure
+        console.log("AuroraAgent - Processing flat array signals:", auroraAgentData.signals.length);
+        
+        // Special debugging for vivienne_bang_dispatch
+        const vivienneSignals = auroraAgentData.signals.filter((s: any) => s.type === 'vivienne_bang_dispatch');
+        console.log("AuroraAgent - All vivienne_bang_dispatch signals:", vivienneSignals);
+        
+        auroraAgentData.signals.forEach((signal: any, index: number) => {
+          if (signal && signal.type) {
+            types.add(signal.type);
+            if (!typeDetails[signal.type]) {
+              typeDetails[signal.type] = [];
+            }
+            typeDetails[signal.type].push({
+              signal_type: signal.signal_type,
+              direction: signal.direction,
+              index: index
+            });
+          }
+        });
+      } else {
+        // Old categorized structure
+        console.log("AuroraAgent - Processing categorized signals");
+        for (const signalKey in auroraAgentData.signals) {
+          if (Object.prototype.hasOwnProperty.call(auroraAgentData.signals, signalKey)) {
+            const signalArray = auroraAgentData.signals[signalKey];
+            if (Array.isArray(signalArray)) {
+              signalArray.forEach((signal: any) => {
+                if (signal && signal.type) {
+                  types.add(signal.type);
+                  if (!typeDetails[signal.type]) {
+                    typeDetails[signal.type] = [];
+                  }
+                  typeDetails[signal.type].push({
+                    signal_type: signal.signal_type,
+                    direction: signal.direction,
+                    category: signalKey
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    console.log("AuroraAgent - Found signal types:", Array.from(types));
+    console.log("AuroraAgent - Signal type details:", typeDetails);
+    
+    return Array.from(types).sort();
+  }, [fullMessage, assetSymbol]);
+
+  // Group signal types by category (buy/sell/neutral)
+  const signalCategories = useMemo(() => {
+    const categories = {
+      buy: [] as string[],
+      sell: [] as string[],
+      neutral: [] as string[]
+    };
+
+    const originalData = fullMessage?.data?.[assetSymbol]?.agents?.AuroraAgent?.data;
+    
+    console.log("AuroraAgent - Categorizing signal types:", allSignalTypes);
+    console.log("AuroraAgent - Original signals data:", originalData?.signals);
+    
+    allSignalTypes.forEach(type => {
+      // Find a sample signal of this type to determine category
+      let sampleSignal = null;
+      
+      if (originalData?.signals) {
+        if (Array.isArray(originalData.signals)) {
+          sampleSignal = originalData.signals.find((s: any) => s.type === type);
+        } else {
+          // Search in all categories
+          for (const signalKey in originalData.signals) {
+            if (Object.prototype.hasOwnProperty.call(originalData.signals, signalKey)) {
+              const signalArray = originalData.signals[signalKey];
+              if (Array.isArray(signalArray)) {
+                sampleSignal = signalArray.find((s: any) => s.type === type);
+                if (sampleSignal) break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (sampleSignal) {
+        const { signal_type, direction } = sampleSignal;
+        
+        // Special debugging for vivienne_bang_dispatch
+        if (type === 'vivienne_bang_dispatch') {
+          console.log(`AuroraAgent - VIVIENNE_BANG_DISPATCH DEBUG:`, {
+            type: type,
+            signal_type: signal_type,
+            direction: direction,
+            full_sample: sampleSignal
+          });
+        }
+        
+        console.log(`AuroraAgent - Signal type "${type}": signal_type="${signal_type}", direction="${direction}", full sample:`, sampleSignal);
+        
+        // More comprehensive categorization logic
+        if (signal_type === 'BULLISH' || direction === 'LONG' || signal_type === 'BUY') {
+          categories.buy.push(type);
+          console.log(`AuroraAgent - Categorized "${type}" as BUY`);
+        } else if (signal_type === 'BEARISH' || direction === 'SHORT' || signal_type === 'SELL') {
+          categories.sell.push(type);
+          console.log(`AuroraAgent - Categorized "${type}" as SELL`);
+        } else {
+          categories.neutral.push(type);
+          console.log(`AuroraAgent - Categorized "${type}" as NEUTRAL`);
+        }
+      } else {
+        // Default to neutral if we can't determine category
+        categories.neutral.push(type);
+        console.log(`AuroraAgent - Categorized "${type}" as NEUTRAL (no sample found)`);
+      }
+    });
+
+    console.log("AuroraAgent - Final categories:", categories);
+    return categories;
+  }, [allSignalTypes, fullMessage, assetSymbol]);
+
+  // Count signals by type
+  const signalCounts = useMemo(() => {
+    const counts: { [key: string]: number } = {};
+    const originalData = fullMessage?.data?.[assetSymbol]?.agents?.AuroraAgent?.data;
+    
+    if (originalData?.signals) {
+      if (Array.isArray(originalData.signals)) {
+        originalData.signals.forEach((signal: any) => {
+          if (signal && signal.type) {
+            counts[signal.type] = (counts[signal.type] || 0) + 1;
+          }
+        });
+      } else {
+        for (const signalKey in originalData.signals) {
+          if (Object.prototype.hasOwnProperty.call(originalData.signals, signalKey)) {
+            const signalArray = originalData.signals[signalKey];
+            if (Array.isArray(signalArray)) {
+              signalArray.forEach((signal: any) => {
+                if (signal && signal.type) {
+                  counts[signal.type] = (counts[signal.type] || 0) + 1;
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    return counts;
+  }, [fullMessage, assetSymbol]);
+
   return (
     <div className="terminal-block mb-4">
       <div className="title-bar">AuroraAgent</div>
@@ -1071,6 +1260,9 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
               resistanceLevel={resistanceLevel}
               historicalSupportLevels={historicalSupportLevels}
               historicalResistanceLevels={historicalResistanceLevels}
+              allSignalTypes={allSignalTypes}
+              signalCounts={signalCounts}
+              signalCategories={signalCategories}
             />
           ) : (
             <div className="text-gray-500 p-4">No chart data available</div>

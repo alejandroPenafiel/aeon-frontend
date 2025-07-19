@@ -20,7 +20,6 @@ interface AgentStatus {
 
 export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
   assetData,
-  selectedAsset,
 }) => {
   // State for managing dropdown visibility
   const [expandedSections, setExpandedSections] = React.useState<{
@@ -105,7 +104,6 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
     const agathaData = assetData.agents.AgathaAgent?.data;
     if (agathaData?.processed_signals) {
       const signals = agathaData.processed_signals;
-      const indicators = signals.indicators;
 
       // Count active signals (signals with confidence > 0)
       const activeSignals = Object.values(signals.signals || {}).filter(
