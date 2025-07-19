@@ -39,7 +39,123 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
 
     const statuses: AgentStatus[] = [];
 
-    // Octavia Agent - Technical Analysis (FIRST - will appear on the left)
+    // Vivienne Agent - Focus on chaos_discerned data (FIRST - will appear on the left)
+    const vivienneData = assetData.agents.VivienneAgent?.data;
+    if (vivienneData?.chaos_discerned) {
+      const chaos = vivienneData.chaos_discerned;
+      statuses.push({
+        name: "Vivienne",
+        state: "", // Removed redundant state display
+        confidence: chaos.total_weighted_confidence || 0,
+        details: "", // Removed redundant details display
+        isActive: chaos.state !== "idle",
+        priority:
+          chaos.state === "bang"
+            ? "high"
+            : chaos.state === "aim"
+              ? "medium"
+              : "low",
+        chaosData: {
+          // MACD trend direction at top level
+          macd_trend_direction: vivienneData.macd_trend_direction || "neutral",
+          // Chaos discerned data (nested structure)
+          chaos_discerned: {
+            sentiment: vivienneData.chaos_discerned?.sentiment || "NEUTRAL",
+            position_type:
+              vivienneData.chaos_discerned?.position_type || "NONE",
+            position_size: vivienneData.chaos_discerned?.position_size || 0,
+            state: vivienneData.chaos_discerned?.state || "idle",
+            num_valid_signals:
+              vivienneData.chaos_discerned?.num_valid_signals || 0,
+            long_total_weight:
+              vivienneData.chaos_discerned?.long_total_weight || 0,
+            short_total_weight:
+              vivienneData.chaos_discerned?.short_total_weight || 0,
+            total_adjusted_weight:
+              vivienneData.chaos_discerned?.total_adjusted_weight || 0,
+            long_weighted_confidence:
+              vivienneData.chaos_discerned?.long_weighted_confidence || 0,
+            short_weighted_confidence:
+              vivienneData.chaos_discerned?.short_weighted_confidence || 0,
+            total_weighted_confidence:
+              vivienneData.chaos_discerned?.total_weighted_confidence || 0,
+            average_confidence:
+              vivienneData.chaos_discerned?.average_confidence || 0,
+            reasoning:
+              vivienneData.chaos_discerned?.reasoning ||
+              "No reasoning available",
+            sorting_signals: {
+              long: vivienneData.chaos_discerned?.sorting_signals?.long || [],
+              short: vivienneData.chaos_discerned?.sorting_signals?.short || [],
+              neutral:
+                vivienneData.chaos_discerned?.sorting_signals?.neutral || [],
+            },
+          },
+          // Filter data (nested structure)
+          latest_trend_filter_blocked: vivienneData.latest_trend_filter_blocked,
+          latest_volatility_filter_blocked:
+            vivienneData.latest_volatility_filter_blocked,
+          // New levels filter data
+          filter_analysis: vivienneData.filter_analysis,
+        },
+      });
+    }
+
+    // Agatha Agent - Signal Processing (SECOND - will appear in the middle)
+    const agathaData = assetData.agents.AgathaAgent?.data;
+    if (agathaData?.processed_signals) {
+      const signals = agathaData.processed_signals;
+      const indicators = signals.indicators;
+
+      // Count active signals (signals with confidence > 0)
+      const activeSignals = Object.values(signals.signals || {}).filter(
+        (signal: any) => signal.confidence > 0,
+      ).length;
+
+      statuses.push({
+        name: "Agatha",
+        state: "", // Removed redundant status display
+        confidence:
+          activeSignals > 0 ? Math.round((activeSignals / 9) * 100) : 0, // 9 total signal types
+        details: "", // Removed redundant signal count display
+        isActive: activeSignals > 0,
+        priority: activeSignals > 0 ? "high" : "low",
+        signalData: {
+          status: signals.status || "STANDBY",
+          price: signals.price || 0,
+          active_signals: activeSignals,
+          total_signals: 9, // Total possible signal types
+          long_signals: Object.values(signals.signals || {}).filter(
+            (s: any) =>
+              (s.signal === "buy" ||
+                s.signal?.toUpperCase().includes("BULLISH")) &&
+              s.confidence > 0,
+          ).length,
+          short_signals: Object.values(signals.signals || {}).filter(
+            (s: any) =>
+              (s.signal === "sell" ||
+                s.signal?.toUpperCase().includes("BEARISH")) &&
+              s.confidence > 0,
+          ).length,
+          neutral_signals: Object.values(signals.signals || {}).filter(
+            (s: any) => s.signal === "hold" && s.confidence > 0,
+          ).length,
+          // Individual signal details
+          signals: signals.signals || {},
+        },
+      });
+    } else {
+      statuses.push({
+        name: "Agatha",
+        state: "STANDBY",
+        confidence: 0,
+        details: "", // Removed redundant signal count display
+        isActive: false,
+        priority: "low",
+      });
+    }
+
+    // Octavia Agent - Technical Analysis (THIRD - will appear on the right)
     const octaviaData = assetData.agents.OctaviaAgent?.data;
     if (octaviaData?.indicators) {
       const indicators = octaviaData.indicators;
@@ -118,145 +234,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
       });
     }
 
-    // Agatha Agent - Signal Processing (SECOND - will appear in the middle)
-    const agathaData = assetData.agents.AgathaAgent?.data;
-    if (agathaData?.processed_signals) {
-      const signals = agathaData.processed_signals;
-      const indicators = signals.indicators;
 
-      // Count active signals (signals with confidence > 0)
-      const activeSignals = Object.values(signals.signals || {}).filter(
-        (signal: any) => signal.confidence > 0,
-      ).length;
-
-      statuses.push({
-        name: "Agatha",
-        state: "", // Removed redundant status display
-        confidence:
-          activeSignals > 0 ? Math.round((activeSignals / 9) * 100) : 0, // 9 total signal types
-        details: "", // Removed redundant signal count display
-        isActive: activeSignals > 0,
-        priority: activeSignals > 0 ? "high" : "low",
-        signalData: {
-          status: signals.status || "STANDBY",
-          price: signals.price || 0,
-          active_signals: activeSignals,
-          total_signals: 9, // Total possible signal types
-          long_signals: Object.values(signals.signals || {}).filter(
-            (s: any) =>
-              (s.signal === "buy" ||
-                s.signal?.toUpperCase().includes("BULLISH")) &&
-              s.confidence > 0,
-          ).length,
-          short_signals: Object.values(signals.signals || {}).filter(
-            (s: any) =>
-              (s.signal === "sell" ||
-                s.signal?.toUpperCase().includes("BEARISH")) &&
-              s.confidence > 0,
-          ).length,
-          neutral_signals: Object.values(signals.signals || {}).filter(
-            (s: any) => s.signal === "hold" && s.confidence > 0,
-          ).length,
-          // Individual signal details
-          signals: signals.signals || {},
-        },
-      });
-    } else {
-      statuses.push({
-        name: "Agatha",
-        state: "STANDBY",
-        confidence: 0,
-        details: "", // Removed redundant signal count display
-        isActive: false,
-        priority: "low",
-      });
-    }
-
-    // Vivienne Agent - Focus on chaos_discerned data (THIRD - will appear on the right)
-    const vivienneData = assetData.agents.VivienneAgent?.data;
-    if (vivienneData?.chaos_discerned) {
-      const chaos = vivienneData.chaos_discerned;
-      statuses.push({
-        name: "Vivienne",
-        state: "", // Removed redundant state display
-        confidence: chaos.total_weighted_confidence || 0,
-        details: "", // Removed redundant details display
-        isActive: chaos.state !== "idle",
-        priority:
-          chaos.state === "bang"
-            ? "high"
-            : chaos.state === "aim"
-              ? "medium"
-              : "low",
-        chaosData: {
-          // MACD trend direction at top level
-          macd_trend_direction: vivienneData.macd_trend_direction || "neutral",
-          // Chaos discerned data (nested structure)
-          chaos_discerned: {
-            sentiment: vivienneData.chaos_discerned?.sentiment || "NEUTRAL",
-            position_type:
-              vivienneData.chaos_discerned?.position_type || "NONE",
-            position_size: vivienneData.chaos_discerned?.position_size || 0,
-            state: vivienneData.chaos_discerned?.state || "idle",
-            num_valid_signals:
-              vivienneData.chaos_discerned?.num_valid_signals || 0,
-            long_total_weight:
-              vivienneData.chaos_discerned?.long_total_weight || 0,
-            short_total_weight:
-              vivienneData.chaos_discerned?.short_total_weight || 0,
-            total_adjusted_weight:
-              vivienneData.chaos_discerned?.total_adjusted_weight || 0,
-            long_weighted_confidence:
-              vivienneData.chaos_discerned?.long_weighted_confidence || 0,
-            short_weighted_confidence:
-              vivienneData.chaos_discerned?.short_weighted_confidence || 0,
-            total_weighted_confidence:
-              vivienneData.chaos_discerned?.total_weighted_confidence || 0,
-            average_confidence:
-              vivienneData.chaos_discerned?.average_confidence || 0,
-            reasoning:
-              vivienneData.chaos_discerned?.reasoning ||
-              "No reasoning available",
-            sorting_signals: {
-              long: vivienneData.chaos_discerned?.sorting_signals?.long || [],
-              short: vivienneData.chaos_discerned?.sorting_signals?.short || [],
-              neutral:
-                vivienneData.chaos_discerned?.sorting_signals?.neutral || [],
-            },
-          },
-          // Filter data (nested structure)
-          latest_trend_filter_blocked: vivienneData.latest_trend_filter_blocked,
-          latest_volatility_filter_blocked:
-            vivienneData.latest_volatility_filter_blocked,
-          // New levels filter data
-          filter_analysis: vivienneData.filter_analysis,
-        },
-      });
-    }
-
-    // Aurora Agent
-    const auroraData = assetData.agents.AuroraAgent?.data;
-    if (auroraData?.signals) {
-      const buySignals = auroraData.signals.buy?.length || 0;
-      const sellSignals = auroraData.signals.sell?.length || 0;
-      statuses.push({
-        name: "Aurora",
-        state: "ANALYZING",
-        confidence: 30,
-        details: `${buySignals} buy, ${sellSignals} sell signals`,
-        isActive: true,
-        priority: "medium",
-      });
-    } else {
-      statuses.push({
-        name: "Aurora",
-        state: "STANDBY",
-        confidence: 0,
-        details: "No signals available",
-        isActive: false,
-        priority: "low",
-      });
-    }
 
     return statuses;
   };
@@ -264,13 +242,13 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
   return (
     <div className="mb-6">
       <div className="text-lg font-bold text-yellow-400 mb-4 font-mono">
-        AGENT STATUS
+        MARKET OPEN PIPELINE
       </div>
       <div className="grid grid-cols-3 gap-4 w-full">
         {getAgentStatuses().map((status, index) => (
           <div
             key={index}
-            className={`terminal-block p-4 min-w-0 flex-shrink-0 w-full ${
+            className={`terminal-block p-4 min-w-0 flex-shrink-0 w-full relative ${
               status.isActive
                 ? "border-green-500 bg-green-900 bg-opacity-20"
                 : "border-gray-600"
@@ -279,7 +257,11 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
             {/* Agent Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <span className="text-lg">🎯</span>
+                <span className="text-lg">
+                  {status.name === "Vivienne" && "🎲"}
+                  {status.name === "Agatha" && "📊"}
+                  {status.name === "Octavia" && "⚡"}
+                </span>
                 <span className="font-bold text-white font-mono">
                   {status.name}
                 </span>
@@ -474,8 +456,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                     </span>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-600"></div>
-                <div className="mt-3">
+                <div className="mt-3 pt-3 border-t border-gray-600">
                   <button
                     onClick={() => toggleSection("vivienne-chaos")}
                     className="w-full text-left text-xs text-gray-400 mb-2 font-mono hover:text-white transition-colors cursor-pointer flex items-center justify-between"
@@ -485,8 +466,8 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                       {expandedSections["vivienne-chaos"] ? "▼" : "▶"}
                     </span>
                   </button>
-                  {expandedSections["vivienne-chaos"] && (
-                    <div className="text-[10px] font-mono">
+                                  {expandedSections["vivienne-chaos"] && (
+                  <div className="text-[12px] font-mono absolute z-10 bg-gray-900 border border-gray-600 p-3 shadow-lg" style={{ top: '100%', left: 0, right: 0 }}>
                       <table className="w-full">
                         <tbody>
                           <tr>
@@ -663,11 +644,11 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
 
                           {/* Current Filter Analysis */}
                           {status.chaosData.filter_analysis?.trend_filter && (
-                            <div className="mb-2 p-1 border border-purple-700 rounded bg-purple-900/20">
-                              <div className="text-[9px] text-purple-400 font-mono mb-1">
+                            <div className="mb-2 p-1 border border-purple-700 bg-purple-900/20">
+                              <div className="text-[11px] text-purple-400 font-mono mb-1">
                                 TREND FILTER ANALYSIS
                               </div>
-                              <div className="text-[8px] text-gray-300">
+                              <div className="text-[10px] text-gray-300">
                                 <div>
                                   Enabled:{" "}
                                   <span
@@ -720,11 +701,11 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
 
                           {status.chaosData.filter_analysis
                             ?.volatility_filter && (
-                            <div className="mb-2 p-1 border border-cyan-700 rounded bg-cyan-900/20">
-                              <div className="text-[9px] text-cyan-400 font-mono mb-1">
+                            <div className="mb-2 p-1 border border-cyan-700 bg-cyan-900/20">
+                              <div className="text-[11px] text-cyan-400 font-mono mb-1">
                                 VOLATILITY FILTER ANALYSIS
                               </div>
-                              <div className="text-[8px] text-gray-300">
+                              <div className="text-[10px] text-gray-300">
                                 <div>
                                   Enabled:{" "}
                                   <span
@@ -792,11 +773,11 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
 
                           {/* New Levels Filter Display */}
                           {status.chaosData.filter_analysis?.levels_filter && (
-                            <div className="mb-2 p-1 border border-blue-700 rounded bg-blue-900/20">
-                              <div className="text-[9px] text-blue-400 font-mono mb-1">
+                            <div className="mb-2 p-1 border border-blue-700 bg-blue-900/20">
+                              <div className="text-[11px] text-blue-400 font-mono mb-1">
                                 LEVELS FILTER
                               </div>
-                              <div className="text-[8px] text-gray-300">
+                              <div className="text-[10px] text-gray-300">
                                 <div>
                                   Status:{" "}
                                   <span
@@ -819,7 +800,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 {status.chaosData.filter_analysis.levels_filter
                                   .support_analysis && (
                                   <div className="mt-2 pt-1 border-t border-gray-600">
-                                    <div className="text-[8px] text-gray-500 mb-1">
+                                    <div className="text-[10px] text-gray-500 mb-1">
                                       SUPPORT ANALYSIS
                                     </div>
                                     <div>
@@ -916,7 +897,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 {status.chaosData.filter_analysis.levels_filter
                                   .resistance_analysis && (
                                   <div className="mt-2 pt-1 border-t border-gray-600">
-                                    <div className="text-[8px] text-gray-500 mb-1">
+                                    <div className="text-[10px] text-gray-500 mb-1">
                                       RESISTANCE ANALYSIS
                                     </div>
                                     <div>
@@ -1032,7 +1013,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                   </span>
                 </button>
                 {expandedSections["octavia-technical"] && (
-                  <div className="text-[10px] font-mono">
+                  <div className="text-[12px] font-mono absolute z-10 bg-gray-900 border border-gray-600 p-3 shadow-lg" style={{ top: '100%', left: 0, right: 0 }}>
                     <table className="w-full">
                       <tbody>
                         <tr>
@@ -1203,7 +1184,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
               <div className="mt-3 pt-3 border-t border-gray-600">
                 <button
                   onClick={() => toggleSection("agatha-signals")}
-                  className="w-full text-left text-[9px] text-gray-500 mb-1 font-mono hover:text-white transition-colors cursor-pointer flex items-center justify-between"
+                  className="w-full text-left text-xs text-gray-400 mb-2 font-mono hover:text-white transition-colors cursor-pointer flex items-center justify-between"
                 >
                   <span>INDIVIDUAL SIGNALS</span>
                   <span className="text-gray-500">
@@ -1211,19 +1192,19 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                   </span>
                 </button>
                 {expandedSections["agatha-signals"] && (
-                  <>
+                  <div className="absolute z-10 bg-gray-900 border border-gray-600 p-3 shadow-lg" style={{ top: '100%', left: 0, right: 0 }}>
                     {Object.entries(status.signalData.signals).map(
                       ([signalName, signalData]: [string, any]) => (
                         <div
                           key={signalName}
-                          className="mb-2 p-1 border border-gray-700 rounded"
+                          className="mb-2 p-1 border border-gray-700"
                         >
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] text-gray-400 font-mono uppercase">
+                            <span className="text-[11px] text-gray-400 font-mono uppercase">
                               {signalName.replace(/_/g, " ")}
                             </span>
                             <span
-                              className={`text-[9px] font-mono ${
+                              className={`text-[11px] font-mono ${
                                 signalData.confidence > 0
                                   ? "text-green-400"
                                   : "text-gray-500"
@@ -1235,7 +1216,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-1 text-[8px]">
+                          <div className="grid grid-cols-1 gap-1 text-[10px]">
                             <div>
                               <span className="text-gray-500">Signal:</span>
                               <span
@@ -1263,14 +1244,14 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                           </div>
 
                           {signalData.details && (
-                            <div className="mt-1 text-[8px] text-gray-400 font-mono">
+                            <div className="mt-1 text-[10px] text-gray-400 font-mono">
                               {signalData.details}
                             </div>
                           )}
                         </div>
                       ),
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             )}
