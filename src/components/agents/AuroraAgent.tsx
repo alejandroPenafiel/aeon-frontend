@@ -27,10 +27,127 @@ const AuroraChart: React.FC<{
   atrData: any[];
   supportLevel: number | null;
   resistanceLevel: number | null;
-}> = React.memo(({ chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel }) => {
+  historicalSupportLevels: number[];
+  historicalResistanceLevels: number[];
+}> = React.memo(({ chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel, historicalSupportLevels, historicalResistanceLevels }) => {
+  // State to track which lines are visible (dimmed or bright)
+  const [visibleLines, setVisibleLines] = useState({
+    close: true,
+    ema3: true,
+    ema5: true,
+    ema21: true,
+    ema30: true,
+    bb_upper: true,
+    bb_middle: true,
+    bb_lower: true,
+  });
+
+  // State to track which signal types are visible
+  const [visibleSignals, setVisibleSignals] = useState({
+    buy: true,
+    sell: true,
+    neutral: true,
+  });
+
+  // Custom legend that looks like default Recharts but with click handlers
+  const CustomLegend = ({ payload }: any) => {
+    const handleLegendClick = (dataKey: string) => {
+      setVisibleLines(prev => ({
+        ...prev,
+        [dataKey as keyof typeof prev]: !prev[dataKey as keyof typeof prev]
+      }));
+    };
+
+    return (
+      <div className="flex flex-wrap gap-4 p-2">
+        {/* Chart line legend items */}
+        {payload?.map((entry: any, index: number) => {
+          const dataKey = entry.dataKey;
+          const isVisible = visibleLines[dataKey as keyof typeof visibleLines];
+          
+          return (
+            <div
+              key={index}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handleLegendClick(dataKey)}
+              style={{ opacity: isVisible ? 1 : 0.3 }}
+            >
+              {/* Render the legend symbol based on the entry type */}
+              {entry.type === 'line' ? (
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                  <line x1="2" y1="8" x2="14" y2="8" stroke={entry.color} strokeWidth="2" />
+                  <circle cx="8" cy="8" r="2" fill={entry.color} />
+                </svg>
+              ) : entry.type === 'scatter' ? (
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                  <circle cx="8" cy="8" r="4" fill={entry.color} />
+                </svg>
+              ) : (
+                <div
+                  className="w-4 h-4"
+                  style={{ backgroundColor: entry.color }}
+                />
+              )}
+              <span className="text-xs text-gray-300">{entry.value}</span>
+            </div>
+          );
+        })}
+
+        {/* Signal legend items */}
+        <div className="flex items-center gap-4 ml-4 border-l border-gray-600 pl-4">
+          {/* Buy Signals */}
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setVisibleSignals(prev => ({ ...prev, buy: !prev.buy }))}
+            style={{ opacity: visibleSignals.buy ? 1 : 0.3 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="6" fill="#22c55e" stroke="#16a34a" strokeWidth="1" />
+              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">B</text>
+            </svg>
+            <span className="text-xs text-gray-300">Buy</span>
+          </div>
+
+          {/* Sell Signals */}
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setVisibleSignals(prev => ({ ...prev, sell: !prev.sell }))}
+            style={{ opacity: visibleSignals.sell ? 1 : 0.3 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="6" fill="#ef4444" stroke="#dc2626" strokeWidth="1" />
+              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">S</text>
+            </svg>
+            <span className="text-xs text-gray-300">Sell</span>
+          </div>
+
+          {/* Neutral/Validate Signals */}
+          <div
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setVisibleSignals(prev => ({ ...prev, neutral: !prev.neutral }))}
+            style={{ opacity: visibleSignals.neutral ? 1 : 0.3 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="6" fill="#60a5fa" stroke="#3b82f6" strokeWidth="1" />
+              <text x="8" y="10" textAnchor="middle" fontSize="10" fill="#ffffff" fontWeight="bold">V</text>
+            </svg>
+            <span className="text-xs text-gray-300">Validate</span>
+          </div>
+
+          {/* Signal Count */}
+          <div className="text-xs text-gray-400 ml-2">
+            ({chartData.filter(d => d.signal).length})
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const SignalDot: React.FC<any> = ({ cx, cy, payload }) => {
     const { signal } = payload;
     if (!signal) return null;
+
+    console.log("AuroraAgent - SignalDot called with signal:", signal);
 
     const { type, strength, signal_type, direction } = signal; // Destructure new fields
 
@@ -38,14 +155,23 @@ const AuroraChart: React.FC<{
     let stroke = '#e4e4e7'; // zinc-200
     let text = '';
     let mappedType = type; // Use the original type as a fallback
+    let signalCategory = 'neutral'; // Default category
 
     // Map new signal types/directions to 'buy', 'sell', 'hold' for consistent coloring
     if (signal_type === 'BULLISH' || direction === 'LONG') {
       mappedType = 'buy';
+      signalCategory = 'buy';
     } else if (signal_type === 'BEARISH' || direction === 'SHORT') {
       mappedType = 'sell';
+      signalCategory = 'sell';
     } else if (type.includes('hold')) { // Check if original type contains 'hold'
       mappedType = 'hold';
+      signalCategory = 'neutral';
+    }
+
+    // Check if this signal type should be visible
+    if (!visibleSignals[signalCategory as keyof typeof visibleSignals]) {
+      return null;
     }
 
     if (mappedType === 'buy') {
@@ -85,17 +211,85 @@ const AuroraChart: React.FC<{
           <XAxis dataKey="time" tickFormatter={(unixTime) => new Date(unixTime * 1000).toUTCString().slice(17, 25)} />
           <YAxis domain={['auto', 'auto']} />
           <Tooltip labelFormatter={(label) => new Date(label * 1000).toUTCString()} />
-          <Legend />
-          <Line type="monotone" dataKey="close" stroke="#22d3ee" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="ema3" stroke="#facc15" strokeWidth={1} dot={false} />
-          <Line type="monotone" dataKey="ema5" stroke="#a78bfa" strokeWidth={1} dot={false} />
-          <Line type="monotone" dataKey="ema21" stroke="#fb923c" strokeWidth={1} dot={false} />
-          <Line type="monotone" dataKey="ema30" stroke="#34d399" strokeWidth={1} dot={false} />
-          <Line type="monotone" dataKey="bb_upper" stroke="#e879f9" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-          <Line type="monotone" dataKey="bb_middle" stroke="#818cf8" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-          <Line type="monotone" dataKey="bb_lower" stroke="#f472b6" strokeWidth={1} dot={false} strokeDasharray="3 3" />
-          <Line type="monotone" dataKey="significant_support" stroke="#22c55e" strokeWidth={2} dot={false} strokeDasharray="5 5" />
-          <Line type="monotone" dataKey="significant_resistance" stroke="#ef4444" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+          <Legend content={<CustomLegend />} />
+          <Line 
+            type="monotone" 
+            dataKey="close" 
+            stroke="#22d3ee" 
+            strokeWidth={2} 
+            dot={false} 
+            strokeOpacity={visibleLines.close ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="ema3" 
+            stroke="#facc15" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeOpacity={visibleLines.ema3 ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="ema5" 
+            stroke="#a78bfa" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeOpacity={visibleLines.ema5 ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="ema21" 
+            stroke="#fb923c" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeOpacity={visibleLines.ema21 ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="ema30" 
+            stroke="#34d399" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeOpacity={visibleLines.ema30 ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="bb_upper" 
+            stroke="#e879f9" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeDasharray="3 3" 
+            strokeOpacity={visibleLines.bb_upper ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="bb_middle" 
+            stroke="#818cf8" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeDasharray="3 3" 
+            strokeOpacity={visibleLines.bb_middle ? 1 : 0.1}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="bb_lower" 
+            stroke="#f472b6" 
+            strokeWidth={1} 
+            dot={false} 
+            strokeDasharray="3 3" 
+            strokeOpacity={visibleLines.bb_lower ? 1 : 0.1}
+          />
+          
+          {/* Debug: Log signal data for Scatter component */}
+          {(() => {
+            const signalsForScatter = chartData.filter(d => d.signal);
+            console.log("AuroraAgent - Signals for Scatter component:", signalsForScatter.length);
+            if (signalsForScatter.length > 0) {
+              console.log("AuroraAgent - First 3 signals for Scatter:", signalsForScatter.slice(0, 3));
+            }
+            return null;
+          })()}
+          
           <Scatter
             name="Signals"
             data={chartData.filter(d => d.signal)}
@@ -103,24 +297,63 @@ const AuroraChart: React.FC<{
             shape={<SignalDot />}
             isAnimationActive={false}
           />
+          {/* Current significant levels */}
           {supportLevel && (
             <ReferenceLine
               y={supportLevel}
               stroke="#22c55e"
-              strokeWidth={1}
+              strokeWidth={2}
               strokeDasharray="2 2"
-              label={{ value: `Current Support: ${supportLevel.toFixed(2)}`, position: "insideTopRight" }}
+              label={{ value: `Current Support: ${supportLevel.toFixed(4)}`, position: "insideTopRight" }}
             />
           )}
           {resistanceLevel && (
             <ReferenceLine
               y={resistanceLevel}
               stroke="#ef4444"
-              strokeWidth={1}
+              strokeWidth={2}
               strokeDasharray="2 2"
-              label={{ value: `Current Resistance: ${resistanceLevel.toFixed(2)}`, position: "insideBottomRight" }}
+              label={{ value: `Current Resistance: ${resistanceLevel.toFixed(4)}`, position: "insideBottomRight" }}
             />
           )}
+          
+          {/* Historical support levels - COMMENTED OUT FOR PERFORMANCE */}
+          {/* {console.log("AuroraAgent - Rendering historical support levels:", historicalSupportLevels)}
+          {historicalSupportLevels
+            .filter(level => typeof level === 'number' && !isNaN(level))
+            .map((level, index) => {
+              console.log(`AuroraAgent - Rendering support level ${index}:`, level);
+              return (
+                <ReferenceLine
+                  key={`support-${index}`}
+                  y={level}
+                  stroke="#22c55e"
+                  strokeWidth={1}
+                  strokeDasharray="1 1"
+                  strokeOpacity={0.6}
+                  label={{ value: `Support: ${level.toFixed(4)}`, position: "insideTopRight", fontSize: 10 }}
+                />
+              );
+            })} */}
+          
+          {/* Historical resistance levels - COMMENTED OUT FOR PERFORMANCE */}
+          {/* {console.log("AuroraAgent - Rendering historical resistance levels:", historicalResistanceLevels)}
+          {historicalResistanceLevels
+            .filter(level => typeof level === 'number' && !isNaN(level))
+            .map((level, index) => {
+              console.log(`AuroraAgent - Rendering resistance level ${index}:`, level);
+              return (
+                <ReferenceLine
+                  key={`resistance-${index}`}
+                  y={level}
+                  stroke="#ef4444"
+                  strokeWidth={1}
+                  strokeDasharray="1 1"
+                  strokeOpacity={0.6}
+                  label={{ value: `Resistance: ${level.toFixed(4)}`, position: "insideBottomRight", fontSize: 10 }}
+                />
+              );
+            })} */}
         </LineChart>
       </ResponsiveContainer>
 
@@ -190,13 +423,15 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     return () => clearInterval(interval);
   }, []);
 
-  const { chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel } = useMemo(() => {
+  const { chartData, macdData, rsiData, atrData, supportLevel, resistanceLevel, historicalSupportLevels, historicalResistanceLevels } = useMemo(() => {
     const processedChartData: any[] = [];
     const processedMacdData: any[] = [];
     const processedRsiData: any[] = [];
     const processedAtrData: any[] = [];
     let latestSupportLevel: number | null = null;
     let latestResistanceLevel: number | null = null;
+    let historicalSupportLevels: number[] = [];
+    let historicalResistanceLevels: number[] = [];
 
     try {
       const auroraAgentData = fullMessage?.data?.[assetSymbol]?.agents?.AuroraAgent?.data;
@@ -262,8 +497,6 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           populateIndicatorMap(indicators.macd_histogram, 'macd_histogram');
           populateIndicatorMap(indicators.rsi, 'rsi');
           populateIndicatorMap(indicators.atr, 'atr');
-          populateIndicatorMap(indicators.significant_support, 'significant_support');
-          populateIndicatorMap(indicators.significant_resistance, 'significant_resistance');
 
           // Process signals for new timestamps only
           if (auroraAgentData.signals) {
@@ -315,8 +548,6 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             bb_upper: indicators.bb_upper,
             bb_middle: indicators.bb_middle,
             bb_lower: indicators.bb_lower,
-            significant_support: indicators.significant_support,
-            significant_resistance: indicators.significant_resistance,
             signal: indicators.signal,
           };
 
@@ -343,14 +574,42 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           newAtrData.push(atrDataItem);
         });
 
+        // Extract latest support and resistance levels for reference lines
+        let latestSupportLevel: number | null = cachedData.supportLevel;
+        let latestResistanceLevel: number | null = cachedData.resistanceLevel;
+        
+        // New structure: filter_status.levels_filter.support_analysis.significant_support
+        if (auroraAgentData.filter_status?.levels_filter?.support_analysis?.significant_support) {
+          latestSupportLevel = auroraAgentData.filter_status.levels_filter.support_analysis.significant_support;
+          console.log("AuroraAgent - Incremental update: Found significant support level:", latestSupportLevel);
+        }
+        // Fallback to old structure
+        else if (auroraAgentData.support_levels?.significant_support) {
+          latestSupportLevel = auroraAgentData.support_levels.significant_support;
+          console.log("AuroraAgent - Incremental update: Found significant support level (fallback):", latestSupportLevel);
+        }
+        
+        // New structure: filter_status.levels_filter.resistance_analysis.significant_resistance
+        if (auroraAgentData.filter_status?.levels_filter?.resistance_analysis?.significant_resistance) {
+          latestResistanceLevel = auroraAgentData.filter_status.levels_filter.resistance_analysis.significant_resistance;
+          console.log("AuroraAgent - Incremental update: Found significant resistance level:", latestResistanceLevel);
+        }
+        // Fallback to old structure
+        else if (auroraAgentData.resistance_levels?.significant_resistance) {
+          latestResistanceLevel = auroraAgentData.resistance_levels.significant_resistance;
+          console.log("AuroraAgent - Incremental update: Found significant resistance level (fallback):", latestResistanceLevel);
+        }
+
         // Combine cached data with new data
         const result = {
           chartData: [...cachedData.chartData, ...newChartData],
           macdData: [...cachedData.macdData, ...newMacdData],
           rsiData: [...cachedData.rsiData, ...newRsiData],
           atrData: [...cachedData.atrData, ...newAtrData],
-          supportLevel: cachedData.supportLevel,
-          resistanceLevel: cachedData.resistanceLevel
+          supportLevel: latestSupportLevel,
+          resistanceLevel: latestResistanceLevel,
+          historicalSupportLevels: historicalSupportLevels,
+          historicalResistanceLevels: historicalResistanceLevels
         };
 
         cachedDataRef.current = result;
@@ -410,6 +669,8 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
         // Debug: Log the entire AuroraAgent data structure
         console.log("AuroraAgent - Full data structure:", auroraAgentData);
         console.log("AuroraAgent - Available keys:", Object.keys(auroraAgentData));
+        console.log("AuroraAgent - Support levels structure:", auroraAgentData.support_levels);
+        console.log("AuroraAgent - Resistance levels structure:", auroraAgentData.resistance_levels);
         
         // Debug: Log the first candle to understand timestamp format
         if (auroraAgentData.candles.length > 0) {
@@ -450,8 +711,6 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           populateIndicatorMap(indicators.macd_histogram, 'macd_histogram');
           populateIndicatorMap(indicators.rsi, 'rsi');
           populateIndicatorMap(indicators.atr, 'atr');
-          populateIndicatorMap(indicators.significant_support, 'significant_support');
-          populateIndicatorMap(indicators.significant_resistance, 'significant_resistance');
 
           // Helper function to populate signal map
           const populateSignalMap = (signalArray: any[]) => {
@@ -491,21 +750,74 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             console.log("AuroraAgent - Raw signals object:", auroraAgentData.signals);
             console.log("AuroraAgent - Signal keys:", Object.keys(auroraAgentData.signals));
             
-            for (const signalKey in auroraAgentData.signals) {
-              if (Object.prototype.hasOwnProperty.call(auroraAgentData.signals, signalKey)) {
-                const signalArray = auroraAgentData.signals[signalKey];
-                console.log(`AuroraAgent - Processing signals for key "${signalKey}":`, signalArray?.length || 0, "signals");
-                if (signalArray && signalArray.length > 0) {
-                  console.log(`AuroraAgent - First signal in "${signalKey}":`, signalArray[0]);
+            // Check if signals is an array (new structure) or object (old structure)
+            if (Array.isArray(auroraAgentData.signals)) {
+              console.log(`AuroraAgent - Processing ${auroraAgentData.signals.length} signals from flat array`);
+              
+              auroraAgentData.signals.forEach((signal: any, index: number) => {
+                if (signal && typeof signal.time === 'number') {
+                  if (index < 5) { // Log first 5 signals for debugging
+                    console.log(`AuroraAgent - Signal ${index}:`, {
+                      time: signal.time,
+                      timeAsDate: new Date(signal.time * 1000).toUTCString(),
+                      type: signal.type,
+                      signal_type: signal.signal_type,
+                      direction: signal.direction,
+                      price: signal.price
+                    });
+                  }
+                  
+                  if (!indicatorsByTime[signal.time]) {
+                    indicatorsByTime[signal.time] = {};
+                  }
+                  indicatorsByTime[signal.time].signal = { 
+                    type: signal.type, 
+                    strength: signal.strength || 'medium',
+                    signal_type: signal.signal_type, 
+                    confidence: signal.confidence, 
+                    price: signal.price, 
+                    direction: signal.direction 
+                  };
                 }
-                populateSignalMap(signalArray);
+              });
+              
+              console.log(`AuroraAgent - Total signals processed from array: ${auroraAgentData.signals.length}`);
+            } else {
+              // Old structure - categorized signals
+              console.log("AuroraAgent - Processing signals from categorized structure");
+              
+              // Count total signals across all categories
+              let totalSignals = 0;
+              for (const signalKey in auroraAgentData.signals) {
+                if (Object.prototype.hasOwnProperty.call(auroraAgentData.signals, signalKey)) {
+                  const signalArray = auroraAgentData.signals[signalKey];
+                  totalSignals += signalArray?.length || 0;
+                  console.log(`AuroraAgent - Processing signals for key "${signalKey}":`, signalArray?.length || 0, "signals");
+                  if (signalArray && signalArray.length > 0) {
+                    console.log(`AuroraAgent - First signal in "${signalKey}":`, signalArray[0]);
+                    console.log(`AuroraAgent - Last signal in "${signalKey}":`, signalArray[signalArray.length - 1]);
+                  }
+                  populateSignalMap(signalArray);
+                }
               }
+              
+              console.log(`AuroraAgent - Total signals processed from categories: ${totalSignals}`);
             }
             
             // Debug: Show what timestamps have signals in the map
             const signalTimestamps = Object.keys(indicatorsByTime).filter(time => indicatorsByTime[Number(time)].signal);
-            console.log("AuroraAgent - Timestamps with signals in map:", signalTimestamps);
+            console.log("AuroraAgent - Timestamps with signals in map:", signalTimestamps.length);
             console.log("AuroraAgent - Total timestamps in indicatorsByTime:", Object.keys(indicatorsByTime).length);
+            
+            // Show sample signals that were processed
+            if (signalTimestamps.length > 0) {
+              console.log("AuroraAgent - Sample processed signals:");
+              signalTimestamps.slice(0, 5).forEach(time => {
+                console.log(`  Time ${time}:`, indicatorsByTime[Number(time)].signal);
+              });
+            }
+          } else {
+            console.log("AuroraAgent - No signals object found in data");
           }
           
           // Debug: Log signal data
@@ -518,14 +830,102 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                          (auroraAgentData.signals?.hold?.length || 0)
           });
           
+          // Debug: Log the entire levels object structure
+          console.log("AuroraAgent - Full levels object:", auroraAgentData.levels);
+          console.log("AuroraAgent - Levels object type:", typeof auroraAgentData.levels);
+          console.log("AuroraAgent - Levels object keys:", auroraAgentData.levels ? Object.keys(auroraAgentData.levels) : 'null/undefined');
+          
           // Extract latest support and resistance levels for reference lines
-          if (Array.isArray(indicators.significant_support) && indicators.significant_support.length > 0) {
-            const lastSupport = indicators.significant_support[indicators.significant_support.length - 1];
-            latestSupportLevel = lastSupport?.value || null;
+          // New structure: filter_status.levels_filter.support_analysis.significant_support
+          if (auroraAgentData.filter_status?.levels_filter?.support_analysis?.significant_support) {
+            latestSupportLevel = auroraAgentData.filter_status.levels_filter.support_analysis.significant_support;
+            console.log("AuroraAgent - Found significant support level:", latestSupportLevel);
+          } 
+          // Fallback to old structure (support_levels.significant_support)
+          else if (auroraAgentData.support_levels?.significant_support) {
+            latestSupportLevel = auroraAgentData.support_levels.significant_support;
+            console.log("AuroraAgent - Found significant support level (fallback):", latestSupportLevel);
           }
-          if (Array.isArray(indicators.significant_resistance) && indicators.significant_resistance.length > 0) {
-            const lastResistance = indicators.significant_resistance[indicators.significant_resistance.length - 1];
-            latestResistanceLevel = lastResistance?.value || null;
+          // Fallback to old structure (levels.support array)
+          else if (Array.isArray(auroraAgentData.levels?.support) && auroraAgentData.levels.support.length > 0) {
+            latestSupportLevel = auroraAgentData.levels.support[auroraAgentData.levels.support.length - 1];
+            console.log("AuroraAgent - Found support level from old structure:", latestSupportLevel);
+          } else {
+            console.log("AuroraAgent - No significant support level found in data");
+          }
+          
+          // Extract historical support levels
+          console.log("AuroraAgent - About to extract historical support levels...");
+          if (Array.isArray(auroraAgentData.levels?.support)) {
+            console.log("AuroraAgent - Raw support levels array:", auroraAgentData.levels.support);
+            // Handle both number format and {time, price} object format
+            historicalSupportLevels = auroraAgentData.levels.support
+              .filter((level: any) => {
+                if (typeof level === 'number') {
+                  return !isNaN(level);
+                } else if (level && typeof level === 'object' && typeof level.price === 'number') {
+                  return !isNaN(level.price);
+                }
+                return false;
+              })
+              .map((level: any) => {
+                if (typeof level === 'number') {
+                  return level;
+                } else if (level && typeof level === 'object' && typeof level.price === 'number') {
+                  return level.price;
+                }
+                return null;
+              })
+              .filter((price: number | null) => price !== null) as number[];
+            console.log("AuroraAgent - Filtered historical support levels:", historicalSupportLevels);
+          } else {
+            console.log("AuroraAgent - No support levels array found or not an array:", auroraAgentData.levels?.support);
+          }
+          
+          // New structure: filter_status.levels_filter.resistance_analysis.significant_resistance
+          if (auroraAgentData.filter_status?.levels_filter?.resistance_analysis?.significant_resistance) {
+            latestResistanceLevel = auroraAgentData.filter_status.levels_filter.resistance_analysis.significant_resistance;
+            console.log("AuroraAgent - Found significant resistance level:", latestResistanceLevel);
+          }
+          // Fallback to old structure (resistance_levels.significant_resistance)
+          else if (auroraAgentData.resistance_levels?.significant_resistance) {
+            latestResistanceLevel = auroraAgentData.resistance_levels.significant_resistance;
+            console.log("AuroraAgent - Found significant resistance level (fallback):", latestResistanceLevel);
+          }
+          // Fallback to old structure (levels.resistance array)
+          else if (Array.isArray(auroraAgentData.levels?.resistance) && auroraAgentData.levels.resistance.length > 0) {
+            latestResistanceLevel = auroraAgentData.levels.resistance[auroraAgentData.levels.resistance.length - 1];
+            console.log("AuroraAgent - Found resistance level from old structure:", latestResistanceLevel);
+          } else {
+            console.log("AuroraAgent - No significant resistance level found in data");
+          }
+          
+          // Extract historical resistance levels
+          console.log("AuroraAgent - About to extract historical resistance levels...");
+          if (Array.isArray(auroraAgentData.levels?.resistance)) {
+            console.log("AuroraAgent - Raw resistance levels array:", auroraAgentData.levels.resistance);
+            // Handle both number format and {time, price} object format
+            historicalResistanceLevels = auroraAgentData.levels.resistance
+              .filter((level: any) => {
+                if (typeof level === 'number') {
+                  return !isNaN(level);
+                } else if (level && typeof level === 'object' && typeof level.price === 'number') {
+                  return !isNaN(level.price);
+                }
+                return false;
+              })
+              .map((level: any) => {
+                if (typeof level === 'number') {
+                  return level;
+                } else if (level && typeof level === 'object' && typeof level.price === 'number') {
+                  return level.price;
+                }
+                return null;
+              })
+              .filter((price: number | null) => price !== null) as number[];
+            console.log("AuroraAgent - Filtered historical resistance levels:", historicalResistanceLevels);
+          } else {
+            console.log("AuroraAgent - No resistance levels array found or not an array:", auroraAgentData.levels?.resistance);
           }
         }
 
@@ -557,8 +957,6 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             bb_upper: indicators.bb_upper,
             bb_middle: indicators.bb_middle,
             bb_lower: indicators.bb_lower,
-            significant_support: indicators.significant_support,
-            significant_resistance: indicators.significant_resistance,
             signal: indicators.signal, // Add signal data to chartDataItem
           };
 
@@ -618,7 +1016,9 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           rsiData: processedRsiData, 
           atrData: processedAtrData,
           supportLevel: latestSupportLevel,
-          resistanceLevel: latestResistanceLevel
+          resistanceLevel: latestResistanceLevel,
+          historicalSupportLevels: historicalSupportLevels,
+          historicalResistanceLevels: historicalResistanceLevels
         };
         cachedDataRef.current = result;
         lastDataVersionRef.current = currentDataVersion;
@@ -638,7 +1038,9 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       rsiData: processedRsiData, 
       atrData: processedAtrData,
       supportLevel: latestSupportLevel,
-      resistanceLevel: latestResistanceLevel
+      resistanceLevel: latestResistanceLevel,
+      historicalSupportLevels: historicalSupportLevels,
+      historicalResistanceLevels: historicalResistanceLevels
     };
   }, [fullMessage, assetSymbol, forceUpdate]); // Added forceUpdate to dependency array
 
@@ -667,6 +1069,8 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
               atrData={atrData}
               supportLevel={supportLevel}
               resistanceLevel={resistanceLevel}
+              historicalSupportLevels={historicalSupportLevels}
+              historicalResistanceLevels={historicalResistanceLevels}
             />
           ) : (
             <div className="text-gray-500 p-4">No chart data available</div>
