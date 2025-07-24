@@ -1,0 +1,664 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  ComposedChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
+
+interface AuroraAgentProps {
+  assetSymbol?: string; // e.g., 'BTC', default to 'BTC'
+  fullMessage: any; // The full websocket message
+  sendMessage?: (message: any) => void; // WebSocket send function
+}
+
+export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', fullMessage, sendMessage }) => {
+  // Extract AuroraAgent data from the websocket message
+  const auroraData = fullMessage?.data?.[assetSymbol]?.agents?.AuroraAgent;
+  const metadata = auroraData?.data?.metadata;
+  const config = auroraData?.config;
+  const candles = auroraData?.data?.candles || [];
+  const indicators = auroraData?.data?.indicators;
+
+  // State for editable config
+  const [editableConfig, setEditableConfig] = useState<Record<string, any>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  
+  // Cache for unsaved changes - persists across WebSocket updates
+  const unsavedChangesRef = useRef<Record<string, any>>({});
+  const lastConfigRef = useRef<Record<string, any>>({});
+  const lastSaveTimeRef = useRef<number>(0);
+
+  // Process chart data
+  const chartData = useMemo(() => {
+    if (!candles || candles.length === 0) return [];
+
+    return candles.map((candle: any, index: number) => {
+      // Ensure candle exists and has required properties
+      if (!candle || typeof candle.time === 'undefined') {
+        console.warn('Invalid candle data:', candle);
+        return null;
+      }
+      const dataPoint: any = {
+        time: new Date(candle.time).toLocaleTimeString(),
+        timestamp: candle.time,
+        index,
+        // Price data
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume,
+        // Additional fields that might exist
+        vwap: candle.vwap,
+        vivienne_significant_support: candle.vivienne_significant_support || null,
+        vivienne_significant_resistance: candle.vivienne_significant_resistance || null,
+        atr: candle.atr,
+        rsi: candle.rsi,
+        ema3: candle.ema3,
+        ema5: candle.ema5,
+        ema21: candle.ema21,
+        macd: candle.macd,
+        macd_signal: candle.macd_signal,
+        macd_histogram: candle.macd_histogram,
+        bb_lower: candle.bb_lower,
+        bb_upper: candle.bb_upper,
+        bb_middle: candle.bb_middle,
+      };
+
+      // Add indicator data from the indicators object if available
+      if (indicators) {
+        // Helper function to get latest value from PriceHistoryItem array
+        const getLatestValue = (data: any) => {
+          if (Array.isArray(data) && data.length > 0) {
+            const latest = data[data.length - 1];
+            return latest?.value?.value || 0;
+          }
+          return typeof data === 'number' ? data : 0;
+        };
+
+        // Override with indicator values if they exist
+        dataPoint.ema3 = getLatestValue(indicators.ema_3) || dataPoint.ema3;
+        dataPoint.ema5 = getLatestValue(indicators.ema_5) || dataPoint.ema5;
+        dataPoint.ema21 = getLatestValue(indicators.ema_21) || dataPoint.ema21;
+        dataPoint.rsi = getLatestValue(indicators.rsi) || dataPoint.rsi;
+        dataPoint.macd = getLatestValue(indicators.macd) || dataPoint.macd;
+        dataPoint.macd_signal = getLatestValue(indicators.macd_signal) || dataPoint.macd_signal;
+        dataPoint.macd_histogram = getLatestValue(indicators.macd_histogram) || dataPoint.macd_histogram;
+        dataPoint.bb_lower = getLatestValue(indicators.bb_lower) || dataPoint.bb_lower;
+        dataPoint.bb_upper = getLatestValue(indicators.bb_upper) || dataPoint.bb_upper;
+        dataPoint.bb_middle = getLatestValue(indicators.bb_middle) || dataPoint.bb_middle;
+        dataPoint.atr = indicators.atr || dataPoint.atr;
+      }
+
+      return dataPoint;
+    }).filter(Boolean); // Remove any null entries
+  }, [candles, indicators]);
+
+  // Helper function to format time for X-axis display
+  const formatTimeForAxis = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      // If it's today, show time in HH:MM format
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    } else {
+      // If it's not today, show date and time
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    }
+  };
+
+  // Custom X-axis tick formatter
+  const CustomXAxisTick = ({ x, y, payload }: any) => {
+    const timeValue = payload.value;
+    const formattedTime = formatTimeForAxis(timeValue);
+    
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text 
+          x={0} 
+          y={0} 
+          dy={16} 
+          textAnchor="middle" 
+          fill="#9CA3AF" 
+          fontSize={10}
+        >
+          {formattedTime}
+        </text>
+      </g>
+    );
+  };
+
+  // Initialize editable config when config data changes, but preserve unsaved changes
+  useEffect(() => {
+    if (config) {
+      const now = Date.now();
+      const timeSinceLastSave = now - lastSaveTimeRef.current;
+      
+      console.log('🔄 AuroraAgent: New config received:', {
+        config,
+        lastConfig: lastConfigRef.current,
+        unsavedChanges: unsavedChangesRef.current,
+        timeSinceLastSave: `${timeSinceLastSave}ms`,
+        hasUnsavedChanges: Object.keys(unsavedChangesRef.current).length > 0
+      });
+      
+      // Store the incoming config for comparison
+      lastConfigRef.current = config;
+      
+      // Merge incoming config with any unsaved changes
+      const mergedConfig = { ...config };
+      
+      // Apply any unsaved changes on top of the new config
+      Object.keys(unsavedChangesRef.current).forEach(key => {
+        if (unsavedChangesRef.current[key] !== undefined) {
+          mergedConfig[key] = unsavedChangesRef.current[key];
+        }
+      });
+      
+      setEditableConfig(mergedConfig);
+      
+      // Update hasChanges based on whether we have unsaved changes
+      const hasUnsavedChanges = Object.keys(unsavedChangesRef.current).length > 0;
+      setHasChanges(hasUnsavedChanges);
+      
+      // If we just saved and the backend sent old values, log a warning
+      if (timeSinceLastSave < 5000 && hasUnsavedChanges) {
+        console.warn('⚠️ AuroraAgent: Backend may have sent old config values after save!', {
+          savedChanges: unsavedChangesRef.current,
+          receivedConfig: config
+        });
+      }
+    }
+  }, [config]);
+
+  // Handle config value changes
+  const handleConfigChange = (key: string, value: string) => {
+    const newConfig = { ...editableConfig };
+    
+    // Try to parse as number if it looks like a number
+    const numValue = parseFloat(value);
+    const parsedValue = isNaN(numValue) ? value : numValue;
+    
+    newConfig[key] = parsedValue;
+    setEditableConfig(newConfig);
+    
+    // Store the change in our cache
+    if (parsedValue !== lastConfigRef.current[key]) {
+      unsavedChangesRef.current[key] = parsedValue;
+    } else {
+      // If the value matches the original, remove it from unsaved changes
+      delete unsavedChangesRef.current[key];
+    }
+    
+    setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+  };
+
+  // Handle save single config value
+  const handleSaveSingleConfig = async (key: string) => {
+    if (!sendMessage) {
+      console.error('❌ sendMessage function not available');
+      return;
+    }
+
+    setIsSaving(true);
+    lastSaveTimeRef.current = Date.now();
+    
+    try {
+      // Send configuration update to backend
+      const configUpdateMessage = {
+        type: 'config_update',
+        agent: 'AuroraAgent',
+        asset: assetSymbol,
+        config: { [key]: editableConfig[key] }
+      };
+      
+      sendMessage(configUpdateMessage);
+      console.log('📤 AuroraAgent: Config update sent:', configUpdateMessage);
+      
+      // Remove from unsaved changes cache
+      delete unsavedChangesRef.current[key];
+      setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+      
+      setEditingKey(null);
+    } catch (error) {
+      console.error('❌ AuroraAgent: Failed to save config:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle cancel editing
+  const handleCancelEdit = () => {
+    // Clear all unsaved changes
+    unsavedChangesRef.current = {};
+    setEditableConfig(lastConfigRef.current);
+    setEditingKey(null);
+    setHasChanges(false);
+  };
+
+  // Handle cancel single edit
+  const handleCancelSingleEdit = (key: string) => {
+    // Restore original value for this key
+    if (unsavedChangesRef.current[key] !== undefined) {
+      delete unsavedChangesRef.current[key];
+      setEditableConfig(prev => ({
+        ...prev,
+        [key]: lastConfigRef.current[key]
+      }));
+      setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+    }
+    setEditingKey(null);
+  };
+
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-gray-900 border border-gray-600 p-2 text-xs font-mono shadow-lg">
+          <p className="text-gray-400 font-bold">{`Time: ${formatTimeForAxis(label)}`}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} style={{ color: entry.color }} className="flex justify-between gap-4">
+              <span>{entry.name}:</span>
+              <span className="font-mono">{entry.value?.toFixed(4) || 'N/A'}</span>
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Render all charts stacked vertically
+  const renderAllCharts = () => {
+    try {
+      if (!chartData || chartData.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            No chart data available
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-4">
+          {/* Price Chart */}
+          <div className="bg-gray-900 border border-gray-700 p-2">
+            <div className="text-green-400 font-bold mb-2">PRICE & EMAs</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => formatTimeForAxis(value)}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  domain={['dataMin - 0.001', 'dataMax + 0.001']}
+                />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: '#6B7280', strokeWidth: 1 }}
+                  labelFormatter={(value) => formatTimeForAxis(value)}
+                />
+                <Legend />
+                
+                {/* Candlestick-like representation */}
+                <Line type="monotone" dataKey="close" stroke="#10B981" strokeWidth={2} dot={false} name="Close" />
+                <Line type="monotone" dataKey="high" stroke="#EF4444" strokeWidth={1} dot={false} name="High" />
+                <Line type="monotone" dataKey="low" stroke="#EF4444" strokeWidth={1} dot={false} name="Low" />
+                
+                {/* EMAs */}
+                <Line type="monotone" dataKey="ema3" stroke="#F59E0B" strokeWidth={1} dot={false} name="EMA3" />
+                <Line type="monotone" dataKey="ema5" stroke="#8B5CF6" strokeWidth={1} dot={false} name="EMA5" />
+                <Line type="monotone" dataKey="ema21" stroke="#EC4899" strokeWidth={1} dot={false} name="EMA21" />
+                
+                {/* VWAP if available */}
+                {chartData[0]?.vwap && (
+                  <Line type="monotone" dataKey="vwap" stroke="#06B6D4" strokeWidth={1} dot={false} name="VWAP" />
+                )}
+                
+                {/* Support/Resistance levels */}
+                {chartData[0]?.vivienne_significant_support && typeof chartData[0].vivienne_significant_support === 'number' && (
+                  <ReferenceLine y={chartData[0].vivienne_significant_support} stroke="#10B981" strokeDasharray="3 3" name="Vivienne Support" />
+                )}
+                {chartData[0]?.vivienne_significant_resistance && typeof chartData[0].vivienne_significant_resistance === 'number' && (
+                  <ReferenceLine y={chartData[0].vivienne_significant_resistance} stroke="#EF4444" strokeDasharray="3 3" name="Vivienne Resistance" />
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Volume Chart */}
+          <div className="bg-gray-900 border border-gray-700 p-2">
+            <div className="text-blue-400 font-bold mb-2">VOLUME</div>
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => formatTimeForAxis(value)}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis stroke="#9CA3AF" fontSize={10} />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ fill: '#374151', fillOpacity: 0.3 }}
+                  labelFormatter={(value) => formatTimeForAxis(value)}
+                />
+                <Legend />
+                <Bar dataKey="volume" fill="#3B82F6" name="Volume" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Indicators Chart */}
+          <div className="bg-gray-900 border border-gray-700 p-2">
+            <div className="text-yellow-400 font-bold mb-2">RSI & ATR</div>
+            <ResponsiveContainer width="100%" height={150}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => formatTimeForAxis(value)}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis stroke="#9CA3AF" fontSize={10} />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: '#6B7280', strokeWidth: 1 }}
+                  labelFormatter={(value) => formatTimeForAxis(value)}
+                />
+                <Legend />
+                
+                {/* RSI */}
+                <Line type="monotone" dataKey="rsi" stroke="#F59E0B" strokeWidth={2} dot={false} name="RSI" />
+                <ReferenceLine y={70} stroke="#EF4444" strokeDasharray="3 3" />
+                <ReferenceLine y={30} stroke="#10B981" strokeDasharray="3 3" />
+                
+                {/* ATR */}
+                <Line type="monotone" dataKey="atr" stroke="#8B5CF6" strokeWidth={1} dot={false} name="ATR" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* MACD Chart */}
+          <div className="bg-gray-900 border border-gray-700 p-2">
+            <div className="text-purple-400 font-bold mb-2">MACD</div>
+            <ResponsiveContainer width="100%" height={150}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => formatTimeForAxis(value)}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis stroke="#9CA3AF" fontSize={10} />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: '#6B7280', strokeWidth: 1 }}
+                  labelFormatter={(value) => formatTimeForAxis(value)}
+                />
+                <Legend />
+                
+                {/* MACD Line */}
+                <Line type="monotone" dataKey="macd" stroke="#3B82F6" strokeWidth={2} dot={false} name="MACD" />
+                <Line type="monotone" dataKey="macd_signal" stroke="#EF4444" strokeWidth={2} dot={false} name="Signal" />
+                
+                {/* MACD Histogram */}
+                <Bar dataKey="macd_histogram" fill="#10B981" name="Histogram" />
+                
+                <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="3 3" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Bollinger Bands Chart */}
+          <div className="bg-gray-900 border border-gray-700 p-2">
+            <div className="text-cyan-400 font-bold mb-2">BOLLINGER BANDS</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis 
+                  dataKey="timestamp" 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  interval="preserveStartEnd"
+                  tickFormatter={(value) => formatTimeForAxis(value)}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis 
+                  stroke="#9CA3AF" 
+                  fontSize={10}
+                  domain={['dataMin - 0.001', 'dataMax + 0.001']}
+                />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: '#6B7280', strokeWidth: 1 }}
+                  labelFormatter={(value) => formatTimeForAxis(value)}
+                />
+                <Legend />
+                
+                {/* Price */}
+                <Line type="monotone" dataKey="close" stroke="#10B981" strokeWidth={2} dot={false} name="Close" />
+                
+                {/* Bollinger Bands */}
+                <Line type="monotone" dataKey="bb_upper" stroke="#EF4444" strokeWidth={1} dot={false} name="BB Upper" />
+                <Line type="monotone" dataKey="bb_middle" stroke="#F59E0B" strokeWidth={1} dot={false} name="BB Middle" />
+                <Line type="monotone" dataKey="bb_lower" stroke="#EF4444" strokeWidth={1} dot={false} name="BB Lower" />
+                
+                {/* Fill area between bands */}
+                <Area 
+                  dataKey="bb_upper" 
+                  stroke="none" 
+                  fill="#EF4444" 
+                  fillOpacity={0.1} 
+                  name="BB Zone"
+                />
+                <Area 
+                  dataKey="bb_lower" 
+                  stroke="none" 
+                  fill="#EF4444" 
+                  fillOpacity={0.1} 
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error rendering charts:', error);
+      return (
+        <div className="flex items-center justify-center h-64 text-red-500">
+          Error rendering charts: {error instanceof Error ? error.message : 'Unknown error'}
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="bg-black border border-gray-700 font-mono text-xs relative">
+      {/* Clean Header with Inline Metadata */}
+      <div className="bg-gray-900 border-b border-gray-700 px-2 py-1">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <span className="text-green-400 font-bold">AURORA</span>
+            {metadata && (
+              <>
+                <span className="text-gray-500">|</span>
+                <span className="text-gray-400">
+                  {metadata.asset_symbol} • v{metadata.data_version} • {metadata.size_mb}MB
+                </span>
+                <span className="text-gray-500">|</span>
+                <span className="text-purple-400">
+                  {metadata.last_updated ? new Date(metadata.last_updated).toLocaleTimeString() : 'N/A'}
+                </span>
+              </>
+            )}
+          </div>
+          
+          {/* Config Dropdown Trigger */}
+          <button
+            onClick={() => setShowConfigModal(!showConfigModal)}
+            className="text-yellow-400 hover:text-yellow-300 hover:bg-gray-800 px-2 py-0.5 border border-transparent hover:border-yellow-600"
+          >
+            CONFIG
+          </button>
+        </div>
+      </div>
+
+      {/* All Charts Stacked */}
+      <div className="p-2">
+        {renderAllCharts()}
+      </div>
+
+      {/* Config Modal Dropdown */}
+      {showConfigModal && (
+        <div className="absolute top-full right-0 z-50 bg-gray-900 border border-gray-600 shadow-lg min-w-80">
+          <div className="p-3">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-yellow-400 font-bold">CONFIGURATION</span>
+              {hasChanges && (
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                  className={`px-2 py-0.5 border ${
+                    isSaving 
+                      ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed' 
+                      : 'bg-red-900 text-red-300 hover:bg-red-800 border-red-700'
+                  }`}
+                >
+                  CANCEL ALL
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              {config ? (
+                Object.entries(config).map(([key, value]) => {
+                  const hasUnsavedChange = unsavedChangesRef.current[key] !== undefined;
+                  const displayValue = editableConfig[key] !== undefined ? editableConfig[key] : value;
+                  
+                  return (
+                    <div key={key} className={`bg-gray-800 border p-2 ${
+                      hasUnsavedChange ? 'border-yellow-600' : 'border-gray-700'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex-1">
+                          <div className="text-gray-400 text-xs uppercase tracking-wide flex items-center gap-2">
+                            {key}
+                            {hasUnsavedChange && (
+                              <span className="text-yellow-400 text-xs">• UNSAVED</span>
+                            )}
+                          </div>
+                          <div className="text-gray-300 text-sm">
+                            {editingKey === key ? (
+                              <input
+                                type="number"
+                                value={displayValue}
+                                onChange={(e) => handleConfigChange(key, e.target.value)}
+                                disabled={isSaving}
+                                className="w-full px-1 py-0.5 bg-black border border-gray-600 text-gray-300 text-xs focus:outline-none focus:border-blue-500"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className={hasUnsavedChange ? 'text-yellow-300' : ''}>
+                                {String(displayValue)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="ml-2">
+                          {editingKey === key ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleSaveSingleConfig(key)}
+                                disabled={isSaving}
+                                className={`px-2 py-0.5 border text-xs ${
+                                  isSaving
+                                    ? 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed'
+                                    : 'bg-green-900 text-green-300 hover:bg-green-800 border-green-700'
+                                }`}
+                              >
+                                {isSaving ? 'SAVING' : 'SAVE'}
+                              </button>
+                              <button
+                                onClick={() => handleCancelSingleEdit(key)}
+                                disabled={isSaving}
+                                className={`px-2 py-0.5 border text-xs ${
+                                  isSaving
+                                    ? 'bg-gray-700 text-gray-500 border-gray-600 cursor-not-allowed'
+                                    : 'bg-red-900 text-red-300 hover:bg-red-800 border-red-700'
+                                }`}
+                              >
+                                CANCEL
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setEditingKey(key)}
+                              className="px-2 py-0.5 bg-blue-900 text-blue-300 hover:bg-blue-800 border border-blue-700 text-xs"
+                            >
+                              EDIT
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <span className="text-gray-600">No config available</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

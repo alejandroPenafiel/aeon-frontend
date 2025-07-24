@@ -22,9 +22,10 @@ interface AssetDetailsProps {
   symbol: string;
   assetData: AssetData;
   fullMessage: WebSocketData; // Add fullMessage prop
+  sendMessage?: (message: any) => void; // Add sendMessage prop
 }
 
-export const AssetDetails: React.FC<AssetDetailsProps> = ({ symbol, assetData, fullMessage }) => {
+export const AssetDetails: React.FC<AssetDetailsProps> = ({ symbol, assetData, fullMessage, sendMessage }) => {
   if (!assetData) {
     return <div className="terminal-block">No data available for {symbol}.</div>;
   }
@@ -43,7 +44,8 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ symbol, assetData, f
               <AgentComponent 
                 key={`${agentName}-${symbol}`} 
                 assetSymbol={symbol} 
-                fullMessage={fullMessage} 
+                fullMessage={fullMessage}
+                sendMessage={sendMessage}
               />
             );
           }

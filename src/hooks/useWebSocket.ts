@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { AccountData, WebSocketData } from '../websocketTypes';
 
 interface CleanedData {
@@ -11,6 +11,7 @@ export function useWebSocket(url: string) {
     accountData: null,
     fullMessage: null,
   });
+  const socketRef = useRef<WebSocket | null>(null);
 
   const processMessage = useCallback((message: any) => {
     // Per user feedback, the correct structure is { type, account_data, data: { assets... } }
@@ -22,8 +23,18 @@ export function useWebSocket(url: string) {
     });
   }, []);
 
+  const sendMessage = useCallback((message: any) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(message));
+      console.log('📤 WebSocket message sent:', message);
+    } else {
+      console.error('❌ WebSocket not connected, cannot send message');
+    }
+  }, []);
+
   useEffect(() => {
     const socket = new WebSocket(url);
+    socketRef.current = socket;
 
     socket.onopen = () => {
       console.log('✅ WebSocket connection established');
@@ -45,12 +56,14 @@ export function useWebSocket(url: string) {
 
     socket.onclose = (event) => {
       console.log('🔌 WebSocket connection closed:', event.code, event.reason);
+      socketRef.current = null;
     };
 
     return () => {
       socket.close();
+      socketRef.current = null;
     };
   }, [url, processMessage]);
 
-  return cleanedData;
+  return { ...cleanedData, sendMessage };
 }

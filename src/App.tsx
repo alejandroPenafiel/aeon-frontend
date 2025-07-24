@@ -8,7 +8,7 @@ import { SignalsFeed } from "./components/SignalsFeed";
 import AgentStatusPanel from "./components/AgentStatusPanel";
 
 function App() {
-  const { accountData, fullMessage } = useWebSocket(
+  const { accountData, fullMessage, sendMessage } = useWebSocket(
     "ws://127.0.0.1:8000/ws/state",
   );
 
@@ -70,6 +70,7 @@ function App() {
             assetData={selectedAssetData}
             symbol={selectedAsset}
             fullMessage={fullMessage}
+            sendMessage={sendMessage}
           />
         )}
       </div>
