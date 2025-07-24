@@ -32,7 +32,7 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ symbol, assetData, f
 
   return (
     <div className="terminal-block">
-      <div className="title-bar">{symbol} DETAILS</div>
+      <div className="title-bar sticky-title-bar">{symbol} DETAILS</div>
       {assetData.agents &&
         Object.keys(agentComponentMap).map((agentName) => {
           const agentData = assetData.agents[agentName as keyof Agents];

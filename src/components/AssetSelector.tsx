@@ -8,7 +8,7 @@ interface AssetSelectorProps {
 
 export const AssetSelector: React.FC<AssetSelectorProps> = ({ assets, selectedAsset, onSelect }) => {
   return (
-    <nav className="asset-selector">
+    <nav className="asset-selector sticky-asset-selector">
       {assets.map(asset => (
         <button
           key={asset}

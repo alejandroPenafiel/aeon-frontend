@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import { FilterStatusPanel } from '../FilterStatusPanel';
 
 interface AuroraAgentProps {
   assetSymbol?: string; // e.g., 'BTC', default to 'BTC'
@@ -32,10 +33,139 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
   const filterStatus = auroraData?.data?.filter_status;
   const config = auroraData?.config;
   
+  // State for editable config
+  const [editableConfig, setEditableConfig] = useState<Record<string, any>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  // Cache for unsaved changes - persists across WebSocket updates
+  const unsavedChangesRef = useRef<Record<string, any>>({});
+  const lastConfigRef = useRef<Record<string, any>>({});
+  const lastSaveTimeRef = useRef<number>(0);
+  
   // Extract VivienneAgent data for significant support/resistance
   const vivienneData = fullMessage?.data?.[assetSymbol]?.agents?.VivienneAgent;
   const vivienneSignificantSupport = vivienneData?.data?.filter_analysis?.levels_filter?.support_analysis?.significant_support;
   const vivienneSignificantResistance = vivienneData?.data?.filter_analysis?.levels_filter?.resistance_analysis?.significant_resistance;
+
+  // Config update effect
+  useEffect(() => {
+    console.log('🔄 AuroraAgent: Config effect triggered', { config, auroraData });
+    
+    if (config) {
+      const now = Date.now();
+      const timeSinceLastSave = now - lastSaveTimeRef.current;
+      
+      console.log('🔄 AuroraAgent: New config received:', {
+        config,
+        configKeys: Object.keys(config),
+        lastConfig: lastConfigRef.current,
+        unsavedChanges: unsavedChangesRef.current,
+        timeSinceLastSave: `${timeSinceLastSave}ms`,
+        hasUnsavedChanges: Object.keys(unsavedChangesRef.current).length > 0
+      });
+      
+      // Store incoming config for comparison
+      lastConfigRef.current = config;
+      
+      // Merge incoming config with unsaved changes
+      const mergedConfig = { ...config };
+      Object.keys(unsavedChangesRef.current).forEach(key => {
+        if (unsavedChangesRef.current[key] !== undefined) {
+          mergedConfig[key] = unsavedChangesRef.current[key];
+        }
+      });
+      
+      setEditableConfig(mergedConfig);
+      setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+      
+      // Warn if backend sent old values after save
+      if (timeSinceLastSave < 5000 && Object.keys(unsavedChangesRef.current).length > 0) {
+        console.warn('⚠️ AuroraAgent: Backend may have sent old config values after save!', {
+          savedChanges: unsavedChangesRef.current,
+          receivedConfig: config
+        });
+      }
+    } else {
+      console.log('⚠️ AuroraAgent: No config data available', { auroraData });
+    }
+  }, [config, auroraData]);
+
+  // Config change handler
+  const handleConfigChange = (key: string, value: string) => {
+    const newConfig = { ...editableConfig };
+    
+    // Parse as number if it looks like a number
+    const numValue = parseFloat(value);
+    const parsedValue = isNaN(numValue) ? value : numValue;
+    
+    newConfig[key] = parsedValue;
+    setEditableConfig(newConfig);
+    
+    // Store change in cache
+    if (parsedValue !== lastConfigRef.current[key]) {
+      unsavedChangesRef.current[key] = parsedValue;
+    } else {
+      delete unsavedChangesRef.current[key];
+    }
+    
+    setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+  };
+
+  // Save handler
+  const handleSaveSingleConfig = async (key: string) => {
+    if (!sendMessage) {
+      console.error('❌ sendMessage function not available');
+      return;
+    }
+
+    setIsSaving(true);
+    lastSaveTimeRef.current = Date.now();
+    
+    try {
+      const configUpdateMessage = {
+        type: 'config_update',
+        agent: 'AuroraAgent',
+        asset: assetSymbol,
+        config: { [key]: editableConfig[key] }
+      };
+      
+      sendMessage(configUpdateMessage);
+      console.log('📤 AuroraAgent: Config update sent:', configUpdateMessage);
+      
+      // Remove from unsaved changes cache
+      delete unsavedChangesRef.current[key];
+      setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+      
+      setEditingKey(null);
+    } catch (error) {
+      console.error('❌ AuroraAgent: Failed to save config:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel handlers
+  const handleCancelEdit = () => {
+    unsavedChangesRef.current = {};
+    setEditableConfig(lastConfigRef.current);
+    setEditingKey(null);
+    setHasChanges(false);
+  };
+
+  const handleCancelSingleEdit = (key: string) => {
+    if (unsavedChangesRef.current[key] !== undefined) {
+      delete unsavedChangesRef.current[key];
+      setEditableConfig(prev => ({
+        ...prev,
+        [key]: lastConfigRef.current[key]
+      }));
+      setHasChanges(Object.keys(unsavedChangesRef.current).length > 0);
+    }
+    setEditingKey(null);
+  };
 
   // Process chart data
   const chartData = useMemo(() => {
@@ -100,6 +230,8 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     atr: true,
     volume: true
   });
+
+
 
   // Function to toggle line visibility
   const toggleLine = (lineKey: string) => {
@@ -437,6 +569,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
                 domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
+                tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
                               <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
@@ -489,6 +622,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
                 domain={[0, 'dataMax + dataMax * 0.15']}
+                tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
               <Tooltip content={<CustomTooltip />} />
               {visibleLines.volume && (
@@ -523,6 +657,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
                 domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
+                tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
                               <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
@@ -545,17 +680,117 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
 
   return (
     <div className="bg-black text-green-400 p-4">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-green-400 mb-2">AURORA AGENT</h2>
-        <div className="text-sm text-gray-400">
-          {metadata && (
-            <div>
-              <p>Asset: {metadata.asset_symbol}</p>
-              <p>Last Updated: {new Date(metadata.last_updated).toLocaleString()}</p>
-              <p>Data Version: {metadata.data_version}</p>
-              <p>Size: {metadata.size_mb?.toFixed(2)} MB</p>
-            </div>
-          )}
+      <div className="mb-4 sticky-aurora-header">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-bold text-green-400">AURORA AGENT</h2>
+            {metadata && (
+              <div className="flex items-center gap-4 text-sm text-gray-400">
+                <span>Asset: {metadata.asset_symbol}</span>
+                <span>Last Updated: {new Date(metadata.last_updated).toLocaleString()}</span>
+                <span>Data Version: {metadata.data_version}</span>
+                <span>Size: {metadata.size_mb?.toFixed(2)} MB</span>
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button 
+              onClick={() => {
+                console.log('🔧 AuroraAgent: CONFIG button clicked, current state:', { showConfigModal, config });
+                setShowConfigModal(!showConfigModal);
+              }}
+              className="text-yellow-400 hover:text-yellow-300 font-mono text-sm px-2 py-1 border border-yellow-400 hover:border-yellow-300"
+            >
+              CONFIG
+            </button>
+            
+            {/* Configuration Dropdown */}
+            {showConfigModal && (
+              <div className="absolute top-full right-0 mt-2 z-50">
+                {/* Dropdown Content */}
+                <div className="bg-gray-900 border border-gray-700 p-4 font-mono text-xs shadow-2xl min-w-80">
+                  <div className="flex justify-end mb-3">
+                    {hasChanges && (
+                      <button
+                        onClick={handleCancelEdit}
+                        className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
+                      >
+                        CANCEL ALL
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Debug info */}
+                  <div className="text-purple-400 text-xs mb-3">
+                    Debug: showConfigModal={showConfigModal.toString()}, 
+                    editableConfig keys: {Object.keys(editableConfig).length}, 
+                    config keys: {config ? Object.keys(config).length : 'null'}
+                  </div>
+                  
+                  {Object.keys(editableConfig).length > 0 ? (
+                    <div className="space-y-2">
+                      {Object.entries(editableConfig).map(([key, value]) => (
+                        <div key={key} className="bg-gray-800 border border-gray-700 p-2 rounded">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 font-mono text-xs">{key}:</span>
+                            <div className="flex items-center gap-2">
+                              {editingKey === key ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={editableConfig[key] || ''}
+                                    onChange={(e) => handleConfigChange(key, e.target.value)}
+                                    className="bg-black border border-gray-600 text-gray-300 px-2 py-1 text-xs w-20"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleSaveSingleConfig(key)}
+                                    disabled={isSaving}
+                                    className="text-green-400 hover:text-green-300 px-2 py-1 border border-green-400 hover:border-green-300 disabled:opacity-50 text-xs"
+                                  >
+                                    {isSaving ? 'SAVING...' : 'SAVE'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleCancelSingleEdit(key)}
+                                    className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
+                                  >
+                                    CANCEL
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-gray-300 text-xs">{value}</span>
+                                  <button
+                                    onClick={() => setEditingKey(key)}
+                                    className="text-blue-400 hover:text-blue-300 px-2 py-1 border border-blue-400 hover:border-blue-300 text-xs"
+                                  >
+                                    EDIT
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {unsavedChangesRef.current[key] !== undefined && (
+                            <div className="text-yellow-400 text-xs mt-1">
+                              ⚠️ Unsaved change: {unsavedChangesRef.current[key]}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 text-center py-4">
+                      No configuration data available
+                      <br />
+                      <span className="text-purple-400 text-xs">
+                        Config data: {config ? JSON.stringify(config) : 'null'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -592,58 +827,8 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       )}
 
       {/* Filter Status */}
-      {filterStatus && (
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-green-400 mb-2">FILTER STATUS</h3>
-          <div className="space-y-2">
-            {Object.entries(filterStatus).map(([filterName, filterData]: [string, any]) => (
-                                 <div key={filterName} className="bg-black border border-gray-700 p-2 rounded">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono capitalize">{filterName.replace(/_/g, ' ')}</span>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    filterData.status === 'Passed' ? 'bg-green-900 text-green-300' :
-                    filterData.status === 'Blocked' ? 'bg-red-900 text-red-300' :
-                    'bg-gray-700 text-gray-300'
-                  }`}>
-                    {filterData.status}
-                  </span>
-                </div>
-                {filterData.reason && (
-                  <p className="text-xs text-gray-400 mt-1">{filterData.reason}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <FilterStatusPanel filterStatus={filterStatus} />
 
-      {/* Configuration */}
-      {config && (
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-green-400 mb-2">CONFIGURATION</h3>
-          <div className="space-y-2">
-            {config.indicator_configs && (
-                                       <div className="bg-black border border-gray-700 p-2 rounded">
-                <h4 className="text-sm font-bold text-green-400 mb-2">INDICATOR CONFIGS</h4>
-                <div className="space-y-1">
-                  {Object.entries(config.indicator_configs).map(([indicatorName, indicatorConfig]: [string, any]) => (
-                    <div key={indicatorName} className="text-xs">
-                      <span className="text-gray-400 font-mono">{indicatorName}:</span>
-                      <div className="ml-4 text-gray-500">
-                        {Object.entries(indicatorConfig).map(([paramName, paramValue]: [string, any]) => (
-                          <div key={paramName}>
-                            <span className="text-gray-400">{paramName}:</span> {paramValue}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

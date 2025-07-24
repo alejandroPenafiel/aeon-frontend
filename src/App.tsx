@@ -8,8 +8,15 @@ import { SignalsFeed } from "./components/SignalsFeed";
 import AgentStatusPanel from "./components/AgentStatusPanel";
 
 function App() {
+  // Dynamic WebSocket URL that works for both local and network access
+  const getWebSocketUrl = () => {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${hostname}:8000/ws/state`;
+  };
+
   const { accountData, fullMessage, sendMessage } = useWebSocket(
-    "ws://127.0.0.1:8000/ws/state",
+    getWebSocketUrl(),
   );
 
   const availableAssets = useMemo(
@@ -30,14 +37,14 @@ function App() {
   }, [fullMessage, selectedAsset]);
 
   return (
-    <div className="min-h-screen bg-black text-green-400 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-black text-green-400 p-2 sm:p-4">
+      <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-green-400 mb-2">
+        <div className="text-center mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 mb-2">
             AEON TRADING DASHBOARD
           </h1>
-          <p className="text-gray-400">
+          <p className="text-sm sm:text-base text-gray-400">
             Real-time agent monitoring and signal analysis
           </p>
         </div>
