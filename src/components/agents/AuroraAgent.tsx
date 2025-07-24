@@ -81,21 +81,111 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     }).filter(Boolean); // Remove any null entries
   }, [candles, indicators, vivienneSignificantSupport, vivienneSignificantResistance]);
 
+  // State for managing line visibility
+  const [visibleLines, setVisibleLines] = useState({
+    price: true,
+    vwap: true,
+    bb_upper: true,
+    bb_middle: true,
+    bb_lower: true,
+    vivienne_support: true,
+    vivienne_resistance: true,
+    ema3: true,
+    ema5: true,
+    ema21: true,
+    ema30: true,
+    rsi: true,
+    macd: true,
+    macd_signal: true,
+    atr: true,
+    volume: true
+  });
+
+  // Function to toggle line visibility
+  const toggleLine = (lineKey: string) => {
+    setVisibleLines(prev => ({
+      ...prev,
+      [lineKey]: !prev[lineKey as keyof typeof prev]
+    }));
+  };
+
+  // Function to toggle all lines
+  const toggleAllLines = (show: boolean) => {
+    setVisibleLines(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(key => {
+        newState[key as keyof typeof newState] = show;
+      });
+      return newState;
+    });
+  };
+
   // Custom tooltip component
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-800 border border-gray-600 p-2 rounded shadow-lg">
+        <div className="bg-black border border-gray-600 p-2 rounded shadow-lg">
           <p className="text-gray-300 text-xs mb-1">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-xs">
-              {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(6) : entry.value}
+              {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(5) : entry.value}
             </p>
           ))}
         </div>
       );
     }
     return null;
+  };
+
+  // Custom legend component with click functionality
+  const CustomLegend = ({ payload }: any) => {
+    if (!payload || payload.length === 0) return null;
+
+    // Map legend names to state keys
+    const nameToKeyMap: { [key: string]: string } = {
+      'Price': 'price',
+      'VWAP': 'vwap',
+      'BB Upper': 'bb_upper',
+      'BB Middle': 'bb_middle',
+      'BB Lower': 'bb_lower',
+      'Vivienne Support': 'vivienne_support',
+      'Vivienne Resistance': 'vivienne_resistance',
+      'EMA3': 'ema3',
+      'EMA5': 'ema5',
+      'EMA21': 'ema21',
+      'EMA30': 'ema30',
+      'RSI': 'rsi',
+      'MACD': 'macd',
+      'Signal': 'macd_signal',
+      'ATR': 'atr',
+      'Volume': 'volume'
+    };
+
+    return (
+      <div className="flex flex-wrap gap-2 p-2 bg-black border border-gray-700 rounded">
+        {payload.map((entry: any, index: number) => {
+          const lineKey = nameToKeyMap[entry.value] || entry.dataKey || entry.value;
+          const isVisible = visibleLines[lineKey as keyof typeof visibleLines];
+          
+          return (
+            <div
+              key={index}
+              className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer transition-opacity ${
+                isVisible ? 'opacity-100' : 'opacity-40'
+              }`}
+              onClick={() => toggleLine(lineKey)}
+              style={{ color: entry.color }}
+            >
+              <div 
+                className="w-3 h-3 rounded-sm"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-xs">{entry.value}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   // Render all charts stacked vertically
@@ -111,11 +201,27 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     return (
       <div className="space-y-4">
         {/* Main Price Chart with Overlays */}
-        <div className="bg-gray-900 border border-gray-700 p-2">
-          <div className="text-green-400 font-bold mb-2">MAIN CHART - PRICE, EMAs, VWAP & BOLLINGER BANDS</div>
+        <div className="bg-black border border-gray-700 p-2">
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-green-400 font-bold">MAIN CHART - PRICE, EMAs, VWAP & BOLLINGER BANDS</div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => toggleAllLines(true)}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Show All
+              </button>
+              <button
+                onClick={() => toggleAllLines(false)}
+                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Hide All
+              </button>
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeWidth={0.5} />
               <XAxis 
                 dataKey="index" 
                 stroke="#9CA3AF" 
@@ -123,14 +229,15 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 tick={{ fill: '#9CA3AF' }}
                 tickFormatter={(value) => chartData[value]?.timestamp || ''}
               />
-              <YAxis 
-                stroke="#9CA3AF" 
+                            <YAxis
+                stroke="#9CA3AF"
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
-                domain={['dataMin - 0.001', 'dataMax + 0.001']}
+                domain={['dataMin - 0.00001', 'dataMax + 0.00001']}
+                tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend />
+              <Legend content={<CustomLegend />} />
               
               {/* Bollinger Bands - Background bands */}
               <Area 
@@ -149,106 +256,140 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
               />
               
               {/* Bollinger Bands - Lines */}
-              <Line 
-                type="monotone" 
-                dataKey="bb_upper" 
-                stroke="#EF4444" 
-                strokeWidth={1}
-                strokeDasharray="5 5"
-                dot={false}
-                name="BB Upper"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="bb_middle" 
-                stroke="#F59E0B" 
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                dot={false}
-                name="BB Middle"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="bb_lower" 
-                stroke="#10B981" 
-                strokeWidth={1}
-                strokeDasharray="5 5"
-                dot={false}
-                name="BB Lower"
-              />
+              {visibleLines.bb_upper && (
+                <Line 
+                  type="monotone" 
+                  dataKey="bb_upper" 
+                  stroke="#EF4444" 
+                  strokeWidth={0.5}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  name="BB Upper"
+                />
+              )}
+              {visibleLines.bb_middle && (
+                <Line 
+                  type="monotone" 
+                  dataKey="bb_middle" 
+                  stroke="#F59E0B" 
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                  dot={false}
+                  name="BB Middle"
+                />
+              )}
+              {visibleLines.bb_lower && (
+                <Line 
+                  type="monotone" 
+                  dataKey="bb_lower" 
+                  stroke="#10B981" 
+                  strokeWidth={0.5}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  name="BB Lower"
+                />
+              )}
               
               {/* VWAP Line */}
-              <Line 
-                type="monotone" 
-                dataKey="vwap" 
-                stroke="#8B5CF6" 
-                strokeWidth={2}
-                strokeDasharray="8 4"
-                dot={false}
-                name="VWAP"
-              />
+              {visibleLines.vwap && (
+                <Line 
+                  type="monotone" 
+                  dataKey="vwap" 
+                  stroke="#8B5CF6" 
+                  strokeWidth={1}
+                  strokeDasharray="8 4"
+                  dot={false}
+                  name="VWAP"
+                />
+              )}
               
               {/* Price Line - Main */}
-              <Line 
-                type="monotone" 
-                dataKey="close" 
-                stroke="#FFFFFF" 
-                strokeWidth={3}
-                dot={false}
-                name="Price"
-              />
+              {visibleLines.price && (
+                <Line 
+                  type="monotone" 
+                  dataKey="close" 
+                  stroke="#FFFFFF" 
+                  strokeWidth={1}
+                  dot={false}
+                  name="Price"
+                />
+              )}
               
               {/* EMAs */}
-              <Line 
-                type="monotone" 
-                dataKey="ema3" 
-                stroke="#F59E0B" 
-                strokeWidth={1}
-                dot={false}
-                name="EMA3"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="ema5" 
-                stroke="#EF4444" 
-                strokeWidth={1}
-                dot={false}
-                name="EMA5"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="ema21" 
-                stroke="#06B6D4" 
-                strokeWidth={1}
-                dot={false}
-                name="EMA21"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="ema30" 
-                stroke="#EC4899" 
-                strokeWidth={1}
-                dot={false}
-                name="EMA30"
-              />
-              
-              {/* Support/Resistance levels */}
-              {vivienneSignificantSupport && typeof vivienneSignificantSupport === 'number' && (
-                <ReferenceLine y={vivienneSignificantSupport} stroke="#10B981" strokeDasharray="3 3" name="Vivienne Support" />
+              {visibleLines.ema3 && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ema3" 
+                  stroke="#F59E0B" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="EMA3"
+                />
               )}
-              {vivienneSignificantResistance && typeof vivienneSignificantResistance === 'number' && (
-                <ReferenceLine y={vivienneSignificantResistance} stroke="#EF4444" strokeDasharray="3 3" name="Vivienne Resistance" />
+              {visibleLines.ema5 && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ema5" 
+                  stroke="#EF4444" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="EMA5"
+                />
+              )}
+              {visibleLines.ema21 && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ema21" 
+                  stroke="#06B6D4" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="EMA21"
+                />
+              )}
+              {visibleLines.ema30 && (
+                <Line 
+                  type="monotone" 
+                  dataKey="ema30" 
+                  stroke="#EC4899" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="EMA30"
+                />
+              )}
+              
+              {/* Vivienne Support/Resistance levels */}
+              {visibleLines.vivienne_support && (
+                <Line 
+                  type="monotone" 
+                  dataKey="vivienne_significant_support" 
+                  stroke="#10B981" 
+                  strokeWidth={0.5}
+                  strokeDasharray="10 5"
+                  dot={false}
+                  name="Vivienne Support"
+                />
+              )}
+              {visibleLines.vivienne_resistance && (
+                <Line 
+                  type="monotone" 
+                  dataKey="vivienne_significant_resistance" 
+                  stroke="#EF4444" 
+                  strokeWidth={0.5}
+                  strokeDasharray="10 5"
+                  dot={false}
+                  name="Vivienne Resistance"
+                />
               )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
 
         {/* RSI Chart */}
-        <div className="bg-gray-900 border border-gray-700 p-2">
+        <div className="bg-black border border-gray-700 p-2">
           <div className="text-green-400 font-bold mb-2">RSI</div>
           <ResponsiveContainer width="100%" height={150}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeWidth={0.5} />
               <XAxis 
                 dataKey="index" 
                 stroke="#9CA3AF" 
@@ -263,13 +404,15 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 domain={[0, 100]}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Line 
-                type="monotone" 
-                dataKey="rsi" 
-                stroke="#F59E0B" 
-                strokeWidth={2}
-                dot={false}
-              />
+              {visibleLines.rsi && (
+                <Line 
+                  type="monotone" 
+                  dataKey="rsi" 
+                  stroke="#F59E0B" 
+                  strokeWidth={0.5}
+                  dot={false}
+                />
+              )}
               <ReferenceLine y={70} stroke="#EF4444" strokeDasharray="3 3" />
               <ReferenceLine y={30} stroke="#10B981" strokeDasharray="3 3" />
             </LineChart>
@@ -277,11 +420,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
         </div>
 
         {/* MACD Chart */}
-        <div className="bg-gray-900 border border-gray-700 p-2">
+        <div className="bg-black border border-gray-700 p-2">
           <div className="text-green-400 font-bold mb-2">MACD</div>
           <ResponsiveContainer width="100%" height={150}>
             <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeWidth={0.5} />
               <XAxis 
                 dataKey="index" 
                 stroke="#9CA3AF" 
@@ -294,24 +437,28 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="macd" 
-                stroke="#10B981" 
-                strokeWidth={2}
-                dot={false}
-                name="MACD"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="macd_signal" 
-                stroke="#EF4444" 
-                strokeWidth={2}
-                dot={false}
-                name="Signal"
-              />
+                              <Tooltip content={<CustomTooltip />} />
+                <Legend content={<CustomLegend />} />
+                {visibleLines.macd && (
+                <Line 
+                  type="monotone" 
+                  dataKey="macd" 
+                  stroke="#10B981" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="MACD"
+                />
+              )}
+              {visibleLines.macd_signal && (
+                <Line 
+                  type="monotone" 
+                  dataKey="macd_signal" 
+                  stroke="#EF4444" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="Signal"
+                />
+              )}
               <Bar 
                 dataKey="macd_histogram" 
                 fill="#8B5CF6" 
@@ -324,11 +471,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
 
 
         {/* Volume Chart */}
-        <div className="bg-gray-900 border border-gray-700 p-2">
+        <div className="bg-black border border-gray-700 p-2">
           <div className="text-green-400 font-bold mb-2">VOLUME</div>
           <ResponsiveContainer width="100%" height={150}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeWidth={0.5} />
               <XAxis 
                 dataKey="index" 
                 stroke="#9CA3AF" 
@@ -342,11 +489,14 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 tick={{ fill: '#9CA3AF' }}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar 
-                dataKey="volume" 
-                fill="#8B5CF6" 
-                name="Volume"
-              />
+              {visibleLines.volume && (
+                <Bar 
+                  dataKey="volume" 
+                  fill="#8B5CF6" 
+                  fillOpacity={0.5}
+                  name="Volume"
+                />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -354,11 +504,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
 
 
         {/* ATR Chart */}
-        <div className="bg-gray-900 border border-gray-700 p-2">
+        <div className="bg-black border border-gray-700 p-2">
           <div className="text-green-400 font-bold mb-2">ATR (AVERAGE TRUE RANGE)</div>
           <ResponsiveContainer width="100%" height={150}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeWidth={0.5} />
               <XAxis 
                 dataKey="index" 
                 stroke="#9CA3AF" 
@@ -371,16 +521,18 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="atr" 
-                stroke="#06B6D4" 
-                strokeWidth={2}
-                dot={false}
-                name="ATR"
-              />
+                              <Tooltip content={<CustomTooltip />} />
+                <Legend content={<CustomLegend />} />
+                {visibleLines.atr && (
+                <Line 
+                  type="monotone" 
+                  dataKey="atr" 
+                  stroke="#06B6D4" 
+                  strokeWidth={0.5}
+                  dot={false}
+                  name="ATR"
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -415,7 +567,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           <h3 className="text-lg font-bold text-green-400 mb-2">SIGNALS</h3>
           <div className="space-y-2">
             {signals.slice(-5).map((signal: any, index: number) => (
-              <div key={index} className="bg-gray-900 border border-gray-700 p-2 rounded">
+                                 <div key={index} className="bg-black border border-gray-700 p-2 rounded">
                 <div className="flex justify-between items-start">
                   <span className="text-sm font-mono">{signal.type}</span>
                   <span className={`text-xs px-2 py-1 rounded ${
@@ -442,7 +594,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           <h3 className="text-lg font-bold text-green-400 mb-2">FILTER STATUS</h3>
           <div className="space-y-2">
             {Object.entries(filterStatus).map(([filterName, filterData]: [string, any]) => (
-              <div key={filterName} className="bg-gray-900 border border-gray-700 p-2 rounded">
+                                 <div key={filterName} className="bg-black border border-gray-700 p-2 rounded">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-mono capitalize">{filterName.replace(/_/g, ' ')}</span>
                   <span className={`text-xs px-2 py-1 rounded ${
@@ -468,7 +620,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           <h3 className="text-lg font-bold text-green-400 mb-2">CONFIGURATION</h3>
           <div className="space-y-2">
             {config.indicator_configs && (
-              <div className="bg-gray-900 border border-gray-700 p-2 rounded">
+                                       <div className="bg-black border border-gray-700 p-2 rounded">
                 <h4 className="text-sm font-bold text-green-400 mb-2">INDICATOR CONFIGS</h4>
                 <div className="space-y-1">
                   {Object.entries(config.indicator_configs).map(([indicatorName, indicatorConfig]: [string, any]) => (
