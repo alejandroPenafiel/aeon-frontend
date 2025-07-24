@@ -233,7 +233,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 stroke="#9CA3AF"
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
-                domain={['dataMin - 0.00001', 'dataMax + 0.00001']}
+                domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
                 tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
               <Tooltip content={<CustomTooltip />} />
@@ -397,11 +397,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 tick={{ fill: '#9CA3AF' }}
                 tickFormatter={(value) => chartData[value]?.timestamp || ''}
               />
-              <YAxis 
+                            <YAxis 
                 stroke="#9CA3AF" 
-                fontSize={10}
+                fontSize={10} 
                 tick={{ fill: '#9CA3AF' }}
-                domain={[0, 100]}
+                domain={[-3, 103]}
               />
               <Tooltip content={<CustomTooltip />} />
               {visibleLines.rsi && (
@@ -436,6 +436,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 stroke="#9CA3AF" 
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
+                domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
               />
                               <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
@@ -487,6 +488,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 stroke="#9CA3AF" 
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
+                domain={[0, 'dataMax + dataMax * 0.15']}
               />
               <Tooltip content={<CustomTooltip />} />
               {visibleLines.volume && (
@@ -520,6 +522,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 stroke="#9CA3AF" 
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
+                domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
               />
                               <Tooltip content={<CustomTooltip />} />
                 <Legend content={<CustomLegend />} />
