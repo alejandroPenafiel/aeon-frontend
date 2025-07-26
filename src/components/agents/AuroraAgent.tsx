@@ -211,6 +211,51 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     }).filter(Boolean); // Remove any null entries
   }, [candles, indicators, vivienneSignificantSupport, vivienneSignificantResistance]);
 
+  // Calculate custom Y-axis domain with support line buffer
+  const customYAxisDomain = useMemo(() => {
+    if (!chartData || chartData.length === 0) {
+      return ['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03'];
+    }
+
+    // Get the minimum and maximum values from the data
+    const allValues = chartData.flatMap((point: any) => [
+      point.low,
+      point.bb_lower,
+      point.vivienne_significant_support
+    ].filter((val: any) => typeof val === 'number' && !isNaN(val)));
+
+    if (allValues.length === 0) {
+      return ['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03'];
+    }
+
+    const dataMin = Math.min(...allValues);
+    const dataMax = Math.max(...chartData.flatMap((point: any) => [
+      point.high,
+      point.bb_upper,
+      point.vivienne_significant_resistance
+    ].filter((val: any) => typeof val === 'number' && !isNaN(val))));
+
+    // Find the lowest support level (including Vivienne support)
+    const supportLevels = chartData
+      .map((point: any) => point.vivienne_significant_support)
+      .filter((val: any) => typeof val === 'number' && !isNaN(val));
+
+    const lowestSupport = supportLevels.length > 0 ? Math.min(...supportLevels) : dataMin;
+
+    // Find the highest resistance level (including Vivienne resistance)
+    const resistanceLevels = chartData
+      .map((point: any) => point.vivienne_significant_resistance)
+      .filter((val: any) => typeof val === 'number' && !isNaN(val));
+
+    const highestResistance = resistanceLevels.length > 0 ? Math.max(...resistanceLevels) : dataMax;
+
+    // Calculate domain with 0.12% buffer on both sides for symmetry
+    const lowerBound = lowestSupport - (lowestSupport * 0.0012); // 0.12% buffer below support
+    const upperBound = highestResistance + (highestResistance * 0.0012); // 0.12% buffer above resistance
+
+    return [lowerBound, upperBound];
+  }, [chartData]);
+
   // State for managing line visibility
   const [visibleLines, setVisibleLines] = useState({
     price: true,
@@ -365,7 +410,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                 stroke="#9CA3AF"
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
-                domain={['dataMin - dataMin * 0.03', 'dataMax + dataMax * 0.03']}
+                domain={customYAxisDomain}
                 tickFormatter={(value) => typeof value === 'number' ? value.toFixed(5) : value}
               />
               <Tooltip content={<CustomTooltip />} />
