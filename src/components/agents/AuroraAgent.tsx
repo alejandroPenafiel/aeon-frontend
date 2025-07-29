@@ -55,7 +55,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      if (showConfigModal && !target.closest('.config-modal-container')) {
+      // Don't close if clicking on the modal content, input fields, or buttons
+      if (showConfigModal && 
+          !target.closest('.config-modal-container') && 
+          !target.closest('input') && 
+          !target.closest('button')) {
         setShowConfigModal(false);
       }
     };
@@ -69,9 +73,67 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
     };
   }, [showConfigModal]);
 
+  // Enhanced config display with descriptions and validation
+  const getParameterInfo = (key: string) => {
+    const parameterInfo: Record<string, { 
+      description: string; 
+      min?: number; 
+      max?: number; 
+      unit?: string;
+      category?: string;
+      group?: string;
+    }> = {
+      agatha_sync_interval: {
+        description: "Data collection cycle frequency",
+        min: 1,
+        max: 60,
+        unit: "seconds",
+        category: "SYNC",
+        group: "Data Collection"
+      },
+      observation_window_octavia: {
+        description: "Historical candles for analysis",
+        min: 10,
+        max: 1000,
+        unit: "candles",
+        category: "ANALYSIS",
+        group: "Analysis Windows"
+      },
+      observation_window_vivienne_filter_status: {
+        description: "Historical filter status entries",
+        min: 10,
+        max: 500,
+        unit: "entries",
+        category: "ANALYSIS",
+        group: "Analysis Windows"
+      },
+      broadcast_interval: {
+        description: "WebSocket broadcast frequency",
+        min: 1,
+        max: 30,
+        unit: "seconds",
+        category: "SYNC",
+        group: "Data Collection"
+      }
+    };
+    return parameterInfo[key] || { 
+      description: "Configuration parameter",
+      category: "OTHER",
+      group: "Other"
+    };
+  };
+
   // Config update effect
   useEffect(() => {
     console.log('🔄 AuroraAgent: Config effect triggered', { config, auroraData });
+    
+    // Get all known parameter keys from getParameterInfo
+    const allKnownParams = [
+      'agatha_sync_interval',
+      'broadcast_interval', 
+      'observation_window_octavia',
+      'observation_window_vivienne_filter_status'
+    ];
     
     if (config) {
       const now = Date.now();
@@ -80,6 +142,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       console.log('🔄 AuroraAgent: New config received:', {
         config,
         configKeys: Object.keys(config),
+        allKnownParams,
         lastConfig: lastConfigRef.current,
         unsavedChanges: unsavedChangesRef.current,
         timeSinceLastSave: `${timeSinceLastSave}ms`,
@@ -89,12 +152,35 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       // Store incoming config for comparison
       lastConfigRef.current = config;
       
-      // Merge incoming config with unsaved changes
-      const mergedConfig = { ...config };
+      // Create a complete config object with all known parameters
+      const completeConfig = { ...config };
+      
+      // Add any missing parameters with default values
+      allKnownParams.forEach(paramKey => {
+        if (completeConfig[paramKey] === undefined || completeConfig[paramKey] === null) {
+          const paramInfo = getParameterInfo(paramKey);
+          // Use a reasonable default value
+          if (paramInfo.min !== undefined) {
+            completeConfig[paramKey] = paramInfo.min;
+          } else {
+            completeConfig[paramKey] = 0; // fallback default
+          }
+          console.log(`🔧 AuroraAgent: Added missing parameter ${paramKey} with default value ${completeConfig[paramKey]}`);
+        }
+      });
+      
+      // Merge with unsaved changes
+      const mergedConfig = { ...completeConfig };
       Object.keys(unsavedChangesRef.current).forEach(key => {
         if (unsavedChangesRef.current[key] !== undefined) {
           mergedConfig[key] = unsavedChangesRef.current[key];
         }
+      });
+      
+      console.log('🔄 AuroraAgent: Final merged config:', {
+        mergedConfig,
+        mergedConfigKeys: Object.keys(mergedConfig),
+        hasChanges: Object.keys(unsavedChangesRef.current).length > 0
       });
       
       setEditableConfig(mergedConfig);
@@ -109,16 +195,41 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       }
     } else {
       console.log('⚠️ AuroraAgent: No config data available', { auroraData });
+      
+      // Initialize with default values if no config is available
+      const defaultConfig: Record<string, any> = {};
+      allKnownParams.forEach(paramKey => {
+        const paramInfo = getParameterInfo(paramKey);
+        if (paramInfo.min !== undefined) {
+          defaultConfig[paramKey] = paramInfo.min;
+        } else {
+          defaultConfig[paramKey] = 0;
+        }
+      });
+      
+      console.log('🔧 AuroraAgent: Initializing with default config:', defaultConfig);
+      setEditableConfig(defaultConfig);
+      setHasChanges(false);
     }
   }, [config, auroraData]);
 
-  // Config change handler
+  // Enhanced config change handler with validation
   const handleConfigChange = (key: string, value: string) => {
     const newConfig = { ...editableConfig };
     
     // Parse as number if it looks like a number
     const numValue = parseFloat(value);
     const parsedValue = isNaN(numValue) ? value : numValue;
+    
+    // Validate integer parameters
+    const paramInfo = getParameterInfo(key);
+    if (paramInfo.min !== undefined && paramInfo.max !== undefined) {
+      if (typeof parsedValue === 'number') {
+        if (parsedValue < paramInfo.min || parsedValue > paramInfo.max) {
+          console.warn(`⚠️ ${key}: Value ${parsedValue} is outside valid range [${paramInfo.min}-${paramInfo.max}]`);
+        }
+      }
+    }
     
     newConfig[key] = parsedValue;
     setEditableConfig(newConfig);
@@ -383,6 +494,23 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
       </div>
     );
   };
+
+  // Group parameters by category
+  const groupedConfig = useMemo(() => {
+    const groups: Record<string, Array<[string, any]>> = {};
+    
+    Object.entries(editableConfig).forEach(([key, value]) => {
+      const paramInfo = getParameterInfo(key);
+      const group = paramInfo.group || 'Other';
+      
+      if (!groups[group]) {
+        groups[group] = [];
+      }
+      groups[group].push([key, value]);
+    });
+    
+    return groups;
+  }, [editableConfig]);
 
   // Render all charts stacked vertically
   const renderAllCharts = () => {
@@ -772,86 +900,117 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             {showConfigModal && (
               <>
                 {/* Backdrop */}
-                <div className="fixed inset-0 bg-black bg-opacity-50" />
-                <div className="absolute top-full right-0 mt-2">
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50" />
+                <div className="absolute top-full right-0 mt-2 z-50">
                   {/* Dropdown Content */}
-                  <div className="bg-gray-900 border border-gray-700 p-4 font-mono text-xs shadow-2xl min-w-80 max-h-96 overflow-y-auto">
-                    <div className="flex justify-end mb-3">
+                  <div className="config-modal-container bg-gray-900 border border-gray-700 p-4 font-mono text-xs shadow-2xl min-w-96 relative z-50">
+                    <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                      <h3 className="text-green-400 font-bold">AURORA CONFIG</h3>
                       {hasChanges && (
                         <button
                           onClick={handleCancelEdit}
                           className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
                         >
-                          CANCEL ALL
+                          RESET ALL
                         </button>
                       )}
                     </div>
                     
-                    {/* Debug info */}
-                    <div className="text-purple-400 text-xs mb-3">
-                      Debug: showConfigModal={showConfigModal.toString()}, 
-                      editableConfig keys: {Object.keys(editableConfig).length}, 
-                      config keys: {config ? Object.keys(config).length : 'null'}
+                    {/* Debug info - more compact */}
+                    <div className="text-purple-400 text-xs mb-3 bg-gray-800 p-2 rounded">
+                      Config: {Object.keys(editableConfig).length} params | 
+                      Changes: {Object.keys(unsavedChangesRef.current).length}
                     </div>
                     
                     {Object.keys(editableConfig).length > 0 ? (
-                      <div className="space-y-2">
-                        {Object.entries(editableConfig).map(([key, value]) => (
-                          <div key={key} className="bg-gray-800 border border-gray-700 p-2 rounded">
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-400 font-mono text-xs">{key}:</span>
-                              <div className="flex items-center gap-2">
-                                {editingKey === key ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={editableConfig[key] || ''}
-                                      onChange={(e) => handleConfigChange(key, e.target.value)}
-                                      className="bg-black border border-gray-600 text-gray-300 px-2 py-1 text-xs w-20"
-                                      autoFocus
-                                    />
-                                    <button
-                                      onClick={() => handleSaveSingleConfig(key)}
-                                      disabled={isSaving}
-                                      className="text-green-400 hover:text-green-300 px-2 py-1 border border-green-400 hover:border-green-300 disabled:opacity-50 text-xs"
-                                    >
-                                      {isSaving ? 'SAVING...' : 'SAVE'}
-                                    </button>
-                                    <button
-                                      onClick={() => handleCancelSingleEdit(key)}
-                                      className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
-                                    >
-                                      CANCEL
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="text-gray-300 text-xs">{value}</span>
-                                    <button
-                                      onClick={() => setEditingKey(key)}
-                                      className="text-blue-400 hover:text-blue-300 px-2 py-1 border border-blue-400 hover:border-blue-300 text-xs"
-                                    >
-                                      EDIT
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                      <div className="space-y-4">
+                        {Object.entries(groupedConfig).map(([groupName, params]) => (
+                          <div key={groupName} className="space-y-2">
+                            <div className="text-blue-400 font-semibold text-xs border-b border-gray-700 pb-1">
+                              {groupName.toUpperCase()}
                             </div>
-                            {unsavedChangesRef.current[key] !== undefined && (
-                              <div className="text-yellow-400 text-xs mt-1">
-                                ⚠️ Unsaved change: {unsavedChangesRef.current[key]}
-                              </div>
-                            )}
+                            {params.map(([key, value]) => {
+                              const paramInfo = getParameterInfo(key);
+                              const isIntegerParam = paramInfo.min !== undefined && paramInfo.max !== undefined;
+                              const hasUnsavedChange = unsavedChangesRef.current[key] !== undefined;
+                              
+                              return (
+                                <div key={key} className={`bg-gray-800 border ${hasUnsavedChange ? 'border-yellow-500' : 'border-gray-700'} p-3 rounded`}>
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-gray-300 font-mono text-xs">{key}</span>
+                                        {isIntegerParam && (
+                                          <span className="text-purple-400 text-xs bg-purple-900 px-1 rounded">
+                                            {paramInfo.min}-{paramInfo.max}
+                                          </span>
+                                        )}
+                                        {hasUnsavedChange && (
+                                          <span className="text-yellow-400 text-xs bg-yellow-900 px-1 rounded">
+                                            UNSAVED
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-gray-500 text-xs">
+                                        {paramInfo.description}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {editingKey === key ? (
+                                        <>
+                                          <input
+                                            type={isIntegerParam ? "number" : "text"}
+                                            value={editableConfig[key] || ''}
+                                            onChange={(e) => handleConfigChange(key, e.target.value)}
+                                            min={paramInfo.min}
+                                            max={paramInfo.max}
+                                            className="bg-black border border-gray-600 text-gray-300 px-2 py-1 text-xs w-16 text-center"
+                                            autoFocus
+                                          />
+                                          <div className="text-gray-500 text-xs">
+                                            {paramInfo.unit}
+                                          </div>
+                                          <button
+                                            onClick={() => handleSaveSingleConfig(key)}
+                                            disabled={isSaving}
+                                            className="text-green-400 hover:text-green-300 px-2 py-1 border border-green-400 hover:border-green-300 disabled:opacity-50 text-xs"
+                                          >
+                                            {isSaving ? '⏳' : '✓'}
+                                          </button>
+                                          <button
+                                            onClick={() => handleCancelSingleEdit(key)}
+                                            className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
+                                          >
+                                            ✗
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="text-right">
+                                            <div className="text-gray-300 text-xs">
+                                              {value}
+                                              <span className="text-gray-500 ml-1">{paramInfo.unit}</span>
+                                            </div>
+                                          </div>
+                                          <button
+                                            onClick={() => setEditingKey(key)}
+                                            className="text-blue-400 hover:text-blue-300 px-2 py-1 border border-blue-400 hover:border-blue-300 text-xs"
+                                          >
+                                            EDIT
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="text-gray-500 text-center py-4">
                         No configuration data available
-                        <br />
-                        <span className="text-purple-400 text-xs">
-                          Config data: {config ? JSON.stringify(config) : 'null'}
-                        </span>
                       </div>
                     )}
                   </div>
