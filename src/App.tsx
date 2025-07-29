@@ -63,6 +63,7 @@ function App() {
         <AgentStatusPanel
           assetData={selectedAssetData}
           selectedAsset={selectedAsset}
+          sendMessage={sendMessage}
         />
 
         {/* Signals Feed - Hidden per user request */}

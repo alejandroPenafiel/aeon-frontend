@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import type { AssetData } from "../websocketTypes";
 
 interface AgentStatusPanelProps {
   assetData: AssetData | null;
   selectedAsset: string | null;
+  sendMessage?: (message: any) => void; // Add WebSocket send function
 }
 
 interface AgentStatus {
@@ -16,22 +17,119 @@ interface AgentStatus {
   chaosData?: any; // Add chaos data for Vivienne
   technicalData?: any; // Add technical data for Octavia
   signalData?: any; // Add signal data for Agatha
+  configData?: any; // Add config data for Configurations
 }
 
 export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
   assetData,
+  sendMessage,
 }) => {
-  // State for managing dropdown visibility
-  const [expandedSections, setExpandedSections] = React.useState<{
-    [key: string]: boolean;
-  }>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [editingConfig, setEditingConfig] = useState<boolean>(false);
+  const [configValues, setConfigValues] = useState<any>({});
 
-  // Toggle dropdown visibility
   const toggleSection = (sectionKey: string) => {
-    setExpandedSections((prev) => ({
+    setExpandedSections(prev => ({
       ...prev,
-      [sectionKey]: !prev[sectionKey],
+      [sectionKey]: !prev[sectionKey]
     }));
+  };
+
+  const toggleConfigEditing = () => {
+    setEditingConfig(!editingConfig);
+  };
+
+  const handleConfigChange = (key: string, value: any) => {
+    setConfigValues(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const saveConfigChanges = () => {
+    if (!sendMessage) {
+      console.error('❌ sendMessage function not available');
+      return;
+    }
+
+    if (!selectedAsset) {
+      console.error('❌ No asset selected');
+      return;
+    }
+
+    try {
+      // Transform flat config values to nested structure expected by backend
+      const nestedConfig = {
+        state_thresholds: {
+          bang_threshold: configValues.bang_threshold ?? status.chaosData.config.bang_threshold,
+          aim_threshold: configValues.aim_threshold ?? status.chaosData.config.aim_threshold,
+          loaded_threshold: configValues.loaded_threshold ?? status.chaosData.config.loaded_threshold,
+        },
+        position_sizing: {
+          position_size_bang: configValues.position_size_bang ?? status.chaosData.config.position_size_bang,
+          position_size_aim: configValues.position_size_aim ?? status.chaosData.config.position_size_aim,
+          position_size_loaded: configValues.position_size_loaded ?? status.chaosData.config.position_size_loaded,
+          position_size_idle: configValues.position_size_idle ?? status.chaosData.config.position_size_idle,
+        },
+        filters: {
+          volatility_filter: {
+            enable_bollinger_filter_for_entry: configValues.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry,
+            bollinger_overextended_block: configValues.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block,
+            volatility_squeeze_threshold: configValues.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold,
+            volatility_breakout_threshold: configValues.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold,
+          },
+          trend_filter: {
+            enable_trend_filter_for_entry: configValues.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry,
+          },
+          levels_filter: {
+            enable_levels_filter_for_entry: configValues.enable_levels_filter_for_entry ?? false,
+            levels_buffer_percent: configValues.levels_buffer_percent ?? 0,
+          },
+          underused_alpha_filter: {
+            retail_chop_trade_count_threshold: configValues.retail_chop_trade_count_threshold ?? 0,
+            retail_chop_avg_trade_size_threshold: configValues.retail_chop_avg_trade_size_threshold ?? 0,
+          },
+          combined_vwap_filter: {
+            weak_pump_trade_count_threshold: configValues.weak_pump_trade_count_threshold ?? 0,
+            weak_pump_avg_trade_size_threshold: configValues.weak_pump_avg_trade_size_threshold ?? 0,
+            distribution_trade_count_threshold: configValues.distribution_trade_count_threshold ?? 0,
+            distribution_avg_trade_size_threshold: configValues.distribution_avg_trade_size_threshold ?? 0,
+          },
+        },
+        signal_weights: {
+          ema_cross: configValues.ema_cross ?? status.chaosData.config.ema_cross,
+          ema_level: configValues.ema_level ?? status.chaosData.config.ema_level,
+          vwap_anchor: configValues.vwap_anchor ?? 0,
+          combined_vwap: configValues.combined_vwap ?? 0,
+          bb_bounce: configValues.bb_bounce ?? status.chaosData.config.bb_bounce,
+          bb_breakout: configValues.bb_breakout ?? status.chaosData.config.bb_breakout,
+          bb_level: configValues.bb_level ?? status.chaosData.config.bb_level,
+          bb_breakout_level: configValues.bb_breakout_level ?? status.chaosData.config.bb_breakout_level,
+          volume_confirmation: configValues.volume_confirmation ?? 0,
+          macd: configValues.macd ?? status.chaosData.config.macd,
+          macd_level: configValues.macd_level ?? status.chaosData.config.macd_level,
+          rsi_cross: configValues.rsi_cross ?? status.chaosData.config.rsi_cross,
+          rsi_level: configValues.rsi_level ?? status.chaosData.config.rsi_level,
+          underused_alpha: configValues.underused_alpha ?? 0,
+        },
+      };
+
+      const configUpdateMessage = {
+        type: 'config_update',
+        agent: 'VivienneAgent',
+        asset: selectedAsset,
+        config: nestedConfig
+      };
+      
+      sendMessage(configUpdateMessage);
+      console.log('📤 VivienneAgent: Config update sent:', configUpdateMessage);
+      
+      // Clear the config values and exit editing mode
+      setConfigValues({});
+      setEditingConfig(false);
+    } catch (error) {
+      console.error('❌ VivienneAgent: Failed to save config:', error);
+    }
   };
   const getAgentStatuses = (): AgentStatus[] => {
     if (!assetData?.agents) return [];
@@ -40,6 +138,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
 
     // Vivienne Agent - Focus on chaos_discerned data (FIRST - will appear on the left)
     const vivienneData = assetData.agents.VivienneAgent?.data;
+    const vivienneConfig = assetData.agents.VivienneAgent?.config;
     if (vivienneData?.chaos_discerned) {
       const chaos = vivienneData.chaos_discerned;
       statuses.push({
@@ -96,6 +195,58 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
             vivienneData.latest_volatility_filter_blocked,
           // New levels filter data
           filter_analysis: vivienneData.filter_analysis,
+          // Configuration data
+          config: vivienneConfig ? {
+            // Thresholds - Updated to use nested structure
+            bang_threshold: vivienneConfig.state_thresholds?.bang_threshold || 0,
+            aim_threshold: vivienneConfig.state_thresholds?.aim_threshold || 0,
+            loaded_threshold: vivienneConfig.state_thresholds?.loaded_threshold || 0,
+            // Position sizes - Updated to use nested structure
+            position_size_bang: vivienneConfig.position_sizing?.position_size_bang || 0,
+            position_size_aim: vivienneConfig.position_sizing?.position_size_aim || 0,
+            position_size_loaded: vivienneConfig.position_sizing?.position_size_loaded || 0,
+            position_size_idle: vivienneConfig.position_sizing?.position_size_idle || 0,
+            // State thresholds - Updated to use nested structure
+            state_threshold_aim: vivienneConfig.state_thresholds?.aim_threshold || 0,
+            state_threshold_bang: vivienneConfig.state_thresholds?.bang_threshold || 0,
+            state_threshold_loaded: vivienneConfig.state_thresholds?.loaded_threshold || 0,
+            // Filters - Updated to use nested structure
+            enable_trend_filter_for_entry: vivienneConfig.filters?.trend_filter?.enable_trend_filter_for_entry || false,
+            enable_bollinger_filter_for_entry: vivienneConfig.filters?.volatility_filter?.enable_bollinger_filter_for_entry || false,
+            bollinger_overextended_block: vivienneConfig.filters?.volatility_filter?.bollinger_overextended_block || false,
+            // Volatility settings - Updated to use nested structure
+            volatility_squeeze_threshold: vivienneConfig.filters?.volatility_filter?.volatility_squeeze_threshold || 0,
+            volatility_breakout_threshold: vivienneConfig.filters?.volatility_filter?.volatility_breakout_threshold || 0,
+            // Signal weights - Updated to use nested structure
+            signal_weights: vivienneConfig.signal_weights || {},
+            // Individual signal thresholds - Updated to use nested structure
+            macd: vivienneConfig.signal_weights?.macd || 0,
+            bb_level: vivienneConfig.signal_weights?.bb_level || 0,
+            bb_bounce: vivienneConfig.signal_weights?.bb_bounce || 0,
+            ema_cross: vivienneConfig.signal_weights?.ema_cross || 0,
+            ema_level: vivienneConfig.signal_weights?.ema_level || 0,
+            rsi_cross: vivienneConfig.signal_weights?.rsi_cross || 0,
+            rsi_level: vivienneConfig.signal_weights?.rsi_level || 0,
+            macd_level: vivienneConfig.signal_weights?.macd_level || 0,
+            bb_breakout: vivienneConfig.signal_weights?.bb_breakout || 0,
+            bb_breakout_level: vivienneConfig.signal_weights?.bb_breakout_level || 0,
+            // Additional parameters from nested structure
+            vwap_anchor: vivienneConfig.signal_weights?.vwap_anchor !== undefined ? vivienneConfig.signal_weights.vwap_anchor : 0,
+            combined_vwap: vivienneConfig.signal_weights?.combined_vwap !== undefined ? vivienneConfig.signal_weights.combined_vwap : 0,
+            volume_confirmation: vivienneConfig.signal_weights?.volume_confirmation !== undefined ? vivienneConfig.signal_weights.volume_confirmation : 0,
+            underused_alpha: vivienneConfig.signal_weights?.underused_alpha !== undefined ? vivienneConfig.signal_weights.underused_alpha : 0,
+            // Levels filter parameters
+            enable_levels_filter_for_entry: vivienneConfig.filters?.levels_filter?.enable_levels_filter_for_entry !== undefined ? vivienneConfig.filters.levels_filter.enable_levels_filter_for_entry : false,
+            levels_buffer_percent: vivienneConfig.filters?.levels_filter?.levels_buffer_percent !== undefined ? vivienneConfig.filters.levels_filter.levels_buffer_percent : 0,
+            // Underused alpha filter parameters
+            retail_chop_trade_count_threshold: vivienneConfig.filters?.underused_alpha_filter?.retail_chop_trade_count_threshold !== undefined ? vivienneConfig.filters.underused_alpha_filter.retail_chop_trade_count_threshold : 0,
+            retail_chop_avg_trade_size_threshold: vivienneConfig.filters?.underused_alpha_filter?.retail_chop_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.underused_alpha_filter.retail_chop_avg_trade_size_threshold : 0,
+            // Combined VWAP filter parameters
+            weak_pump_trade_count_threshold: vivienneConfig.filters?.combined_vwap_filter?.weak_pump_trade_count_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.weak_pump_trade_count_threshold : 0,
+            weak_pump_avg_trade_size_threshold: vivienneConfig.filters?.combined_vwap_filter?.weak_pump_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.weak_pump_avg_trade_size_threshold : 0,
+            distribution_trade_count_threshold: vivienneConfig.filters?.combined_vwap_filter?.distribution_trade_count_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.distribution_trade_count_threshold : 0,
+            distribution_avg_trade_size_threshold: vivienneConfig.filters?.combined_vwap_filter?.distribution_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.distribution_avg_trade_size_threshold : 0,
+          } : null,
         },
       });
     }
@@ -232,8 +383,6 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
       });
     }
 
-
-
     return statuses;
   };
 
@@ -259,6 +408,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                   {status.name === "Vivienne" && "🎲"}
                   {status.name === "Agatha" && "📊"}
                   {status.name === "Octavia" && "⚡"}
+                  {status.name === "Configurations" && "⚙️"}
                 </span>
                 <span className="font-bold text-white font-mono">
                   {status.name}
@@ -270,6 +420,54 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Special header info for Configurations */}
+            {status.name === "Configurations" && status.configData && (
+              <div className="text-[10px] font-mono mb-2 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Bang Threshold:</span>
+                  <span className="text-yellow-400">
+                    {status.configData.bang_threshold}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Aim Threshold:</span>
+                  <span className="text-yellow-400">
+                    {status.configData.aim_threshold}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Loaded Threshold:</span>
+                  <span className="text-yellow-400">
+                    {status.configData.loaded_threshold}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Bang Size:</span>
+                  <span className="text-green-400">
+                    {status.configData.position_size_bang}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Aim Size:</span>
+                  <span className="text-green-400">
+                    {status.configData.position_size_aim}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Loaded Size:</span>
+                  <span className="text-green-400">
+                    {status.configData.position_size_loaded}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Idle Size:</span>
+                  <span className="text-gray-400">
+                    {status.configData.position_size_idle}%
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Special header info for Octavia */}
             {status.name === "Octavia" && status.technicalData && (
@@ -1075,6 +1273,629 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                   )}
                 </div>
               </>
+            )}
+
+            {/* Clickable dropdown for Vivienne configurations */}
+            {status.name === "Vivienne" && status.chaosData?.config && (
+              <div className="mt-3 pt-3 border-t border-gray-600">
+                <button
+                  onClick={() => toggleSection("vivienne-config")}
+                  className="w-full text-left text-xs text-gray-400 mb-2 font-mono hover:text-white transition-colors cursor-pointer flex items-center justify-between"
+                >
+                  <span>CONFIGURATIONS</span>
+                  <span className="text-gray-500">
+                    {expandedSections["vivienne-config"] ? "▼" : "▶"}
+                  </span>
+                </button>
+                {expandedSections["vivienne-config"] && (
+                  <div className="text-[12px] font-mono absolute z-10 bg-gray-900 border border-gray-600 p-3 shadow-lg" style={{ top: '100%', left: 0, right: 0 }}>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs text-gray-400">Configuration Settings</span>
+                      <button
+                        onClick={toggleConfigEditing}
+                        className="text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
+                      >
+                        {editingConfig ? "Cancel" : "Edit"}
+                      </button>
+                    </div>
+                    
+                    <table className="w-full">
+                      <tbody>
+                        {/* State Thresholds Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-purple-400 font-mono py-1 border-b border-gray-700">
+                            STATE THRESHOLDS
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Bang Threshold:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.bang_threshold ?? status.chaosData.config.bang_threshold}
+                                onChange={(e) => handleConfigChange('bang_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.bang_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Aim Threshold:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.aim_threshold ?? status.chaosData.config.aim_threshold}
+                                onChange={(e) => handleConfigChange('aim_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.aim_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Loaded Threshold:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.loaded_threshold ?? status.chaosData.config.loaded_threshold}
+                                onChange={(e) => handleConfigChange('loaded_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.loaded_threshold
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Position Sizes Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-green-400 font-mono py-1 border-b border-gray-700">
+                            POSITION SIZES
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Bang Size:</td>
+                          <td className="text-green-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.position_size_bang ?? status.chaosData.config.position_size_bang}
+                                onChange={(e) => handleConfigChange('position_size_bang', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              `${status.chaosData.config.position_size_bang}%`
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Aim Size:</td>
+                          <td className="text-green-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.position_size_aim ?? status.chaosData.config.position_size_aim}
+                                onChange={(e) => handleConfigChange('position_size_aim', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              `${status.chaosData.config.position_size_aim}%`
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Loaded Size:</td>
+                          <td className="text-green-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.position_size_loaded ?? status.chaosData.config.position_size_loaded}
+                                onChange={(e) => handleConfigChange('position_size_loaded', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              `${status.chaosData.config.position_size_loaded}%`
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Idle Size:</td>
+                          <td className="text-gray-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.position_size_idle ?? status.chaosData.config.position_size_idle}
+                                onChange={(e) => handleConfigChange('position_size_idle', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-gray-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              `${status.chaosData.config.position_size_idle}%`
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Volatility Filter Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-blue-400 font-mono py-1 border-b border-gray-700">
+                            VOLATILITY FILTER
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Bollinger Filter:</td>
+                          <td className={`text-right ${status.chaosData.config.enable_bollinger_filter_for_entry ? 'text-green-400' : 'text-red-400'}`}>
+                            {editingConfig ? (
+                              <select
+                                value={configValues.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry}
+                                onChange={(e) => handleConfigChange('enable_bollinger_filter_for_entry', e.target.value === 'true')}
+                                className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
+                              >
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                              </select>
+                            ) : (
+                              status.chaosData.config.enable_bollinger_filter_for_entry ? 'Enabled' : 'Disabled'
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Overextended Block:</td>
+                          <td className={`text-right ${status.chaosData.config.bollinger_overextended_block ? 'text-red-400' : 'text-green-400'}`}>
+                            {editingConfig ? (
+                              <select
+                                value={configValues.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block}
+                                onChange={(e) => handleConfigChange('bollinger_overextended_block', e.target.value === 'true')}
+                                className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
+                              >
+                                <option value="true">Blocked</option>
+                                <option value="false">Allowed</option>
+                              </select>
+                            ) : (
+                              status.chaosData.config.bollinger_overextended_block ? 'Blocked' : 'Allowed'
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Squeeze Threshold:</td>
+                          <td className="text-blue-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold}
+                                onChange={(e) => handleConfigChange('volatility_squeeze_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-blue-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.volatility_squeeze_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Breakout Threshold:</td>
+                          <td className="text-blue-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold}
+                                onChange={(e) => handleConfigChange('volatility_breakout_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-blue-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.volatility_breakout_threshold
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Trend Filter Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-cyan-400 font-mono py-1 border-b border-gray-700">
+                            TREND FILTER
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Trend Filter Entry:</td>
+                          <td className={`text-right ${status.chaosData.config.enable_trend_filter_for_entry ? 'text-green-400' : 'text-red-400'}`}>
+                            {editingConfig ? (
+                              <select
+                                value={configValues.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry}
+                                onChange={(e) => handleConfigChange('enable_trend_filter_for_entry', e.target.value === 'true')}
+                                className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
+                              >
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                              </select>
+                            ) : (
+                              status.chaosData.config.enable_trend_filter_for_entry ? 'Enabled' : 'Disabled'
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Levels Filter Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-orange-400 font-mono py-1 border-b border-gray-700">
+                            LEVELS FILTER
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Levels Filter Entry:</td>
+                          <td className="text-orange-400 text-right">
+                            {editingConfig ? (
+                              <select
+                                value={configValues.enable_levels_filter_for_entry ?? status.chaosData.config.enable_levels_filter_for_entry}
+                                onChange={(e) => handleConfigChange('enable_levels_filter_for_entry', e.target.value === 'true')}
+                                className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
+                              >
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                              </select>
+                            ) : (
+                              status.chaosData.config.enable_levels_filter_for_entry ? 'Enabled' : 'Disabled'
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Levels Buffer %:</td>
+                          <td className="text-orange-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.levels_buffer_percent ?? status.chaosData.config.levels_buffer_percent}
+                                onChange={(e) => handleConfigChange('levels_buffer_percent', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-orange-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              `${status.chaosData.config.levels_buffer_percent}%`
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Underused Alpha Filter Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-pink-400 font-mono py-1 border-b border-gray-700">
+                            UNDERUSED ALPHA FILTER
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Retail Chop Trade Count:</td>
+                          <td className="text-pink-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.retail_chop_trade_count_threshold ?? status.chaosData.config.retail_chop_trade_count_threshold}
+                                onChange={(e) => handleConfigChange('retail_chop_trade_count_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-pink-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.retail_chop_trade_count_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Retail Chop Avg Trade Size:</td>
+                          <td className="text-pink-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.retail_chop_avg_trade_size_threshold ?? status.chaosData.config.retail_chop_avg_trade_size_threshold}
+                                onChange={(e) => handleConfigChange('retail_chop_avg_trade_size_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-pink-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.retail_chop_avg_trade_size_threshold
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Combined VWAP Filter Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-indigo-400 font-mono py-1 border-b border-gray-700">
+                            COMBINED VWAP FILTER
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Weak Pump Trade Count:</td>
+                          <td className="text-indigo-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.weak_pump_trade_count_threshold ?? status.chaosData.config.weak_pump_trade_count_threshold}
+                                onChange={(e) => handleConfigChange('weak_pump_trade_count_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-indigo-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.weak_pump_trade_count_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Weak Pump Avg Trade Size:</td>
+                          <td className="text-indigo-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.weak_pump_avg_trade_size_threshold ?? status.chaosData.config.weak_pump_avg_trade_size_threshold}
+                                onChange={(e) => handleConfigChange('weak_pump_avg_trade_size_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-indigo-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.weak_pump_avg_trade_size_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Distribution Trade Count:</td>
+                          <td className="text-indigo-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.distribution_trade_count_threshold ?? status.chaosData.config.distribution_trade_count_threshold}
+                                onChange={(e) => handleConfigChange('distribution_trade_count_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-indigo-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.distribution_trade_count_threshold
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Distribution Avg Trade Size:</td>
+                          <td className="text-indigo-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.distribution_avg_trade_size_threshold ?? status.chaosData.config.distribution_avg_trade_size_threshold}
+                                onChange={(e) => handleConfigChange('distribution_avg_trade_size_threshold', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-indigo-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.distribution_avg_trade_size_threshold
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Signal Weights Section */}
+                        <tr>
+                          <td colSpan={2} className="text-[11px] text-yellow-400 font-mono py-1 border-b border-gray-700">
+                            SIGNAL WEIGHTS
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">EMA Cross:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.ema_cross ?? status.chaosData.config.ema_cross}
+                                onChange={(e) => handleConfigChange('ema_cross', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.ema_cross
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">EMA Level:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.ema_level ?? status.chaosData.config.ema_level}
+                                onChange={(e) => handleConfigChange('ema_level', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.ema_level
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">VWAP Anchor:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.vwap_anchor ?? status.chaosData.config.vwap_anchor}
+                                onChange={(e) => handleConfigChange('vwap_anchor', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.vwap_anchor
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Combined VWAP:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.combined_vwap ?? status.chaosData.config.combined_vwap}
+                                onChange={(e) => handleConfigChange('combined_vwap', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.combined_vwap
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">BB Bounce:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.bb_bounce ?? status.chaosData.config.bb_bounce}
+                                onChange={(e) => handleConfigChange('bb_bounce', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.bb_bounce
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">BB Breakout:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.bb_breakout ?? status.chaosData.config.bb_breakout}
+                                onChange={(e) => handleConfigChange('bb_breakout', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.bb_breakout
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">BB Level:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.bb_level ?? status.chaosData.config.bb_level}
+                                onChange={(e) => handleConfigChange('bb_level', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.bb_level
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">BB Breakout Level:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.bb_breakout_level ?? status.chaosData.config.bb_breakout_level}
+                                onChange={(e) => handleConfigChange('bb_breakout_level', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.bb_breakout_level
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Volume Confirmation:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.volume_confirmation ?? status.chaosData.config.volume_confirmation}
+                                onChange={(e) => handleConfigChange('volume_confirmation', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.volume_confirmation
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">MACD:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.macd ?? status.chaosData.config.macd}
+                                onChange={(e) => handleConfigChange('macd', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.macd
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">MACD Level:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.macd_level ?? status.chaosData.config.macd_level}
+                                onChange={(e) => handleConfigChange('macd_level', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.macd_level
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">RSI Cross:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.rsi_cross ?? status.chaosData.config.rsi_cross}
+                                onChange={(e) => handleConfigChange('rsi_cross', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.rsi_cross
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">RSI Level:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.rsi_level ?? status.chaosData.config.rsi_level}
+                                onChange={(e) => handleConfigChange('rsi_level', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.rsi_level
+                            )}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="text-gray-400 pr-2">Underused Alpha:</td>
+                          <td className="text-yellow-400 text-right">
+                            {editingConfig ? (
+                              <input
+                                type="number"
+                                value={configValues.underused_alpha ?? status.chaosData.config.underused_alpha}
+                                onChange={(e) => handleConfigChange('underused_alpha', parseFloat(e.target.value))}
+                                className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
+                              />
+                            ) : (
+                              status.chaosData.config.underused_alpha
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {editingConfig && (
+                      <div className="mt-3 pt-3 border-t border-gray-600 flex justify-end space-x-2">
+                        <button
+                          onClick={saveConfigChanges}
+                          className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={toggleConfigEditing}
+                          className="text-xs px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Clickable dropdown for Octavia technical data */}

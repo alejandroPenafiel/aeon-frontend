@@ -296,32 +296,59 @@ export interface SortingSignals {
 }
 
 export interface VivienneAgentConfig {
-  bang_threshold: number;
-  aim_threshold: number;
-  loaded_threshold: number;
-  position_size_bang: number;
-  position_size_aim: number;
-  position_size_loaded: number;
-  position_size_idle: number;
-  enable_trend_filter_for_entry: boolean;
-  macd: number;
-  bb_level: number;
-  bb_bounce: number;
-  ema_cross: number;
-  ema_level: number;
-  rsi_cross: number;
-  rsi_level: number;
-  macd_level: number;
-  bb_breakout: number;
-  bb_breakout_level: number;
-  state_threshold_aim: number;
-  state_threshold_bang: number;
-  state_threshold_loaded: number;
-  enable_bollinger_filter_for_entry: boolean;
-  bollinger_overextended_block: boolean;
-  volatility_squeeze_threshold: number;
-  volatility_breakout_threshold: number;
-  signal_weights: SignalWeights;
+  // Updated to match actual WebSocket data structure
+  state_thresholds: {
+    bang_threshold: number;
+    aim_threshold: number;
+    loaded_threshold: number;
+  };
+  position_sizing: {
+    position_size_bang: number;
+    position_size_aim: number;
+    position_size_loaded: number;
+    position_size_idle: number;
+  };
+  filters: {
+    volatility_filter: {
+      enable_bollinger_filter_for_entry: boolean;
+      bollinger_overextended_block: boolean;
+      volatility_squeeze_threshold: number;
+      volatility_breakout_threshold: number;
+    };
+    trend_filter: {
+      enable_trend_filter_for_entry: boolean;
+    };
+    levels_filter: {
+      enable_levels_filter_for_entry: boolean;
+      levels_buffer_percent: number;
+    };
+    underused_alpha_filter: {
+      retail_chop_trade_count_threshold: number;
+      retail_chop_avg_trade_size_threshold: number;
+    };
+    combined_vwap_filter: {
+      weak_pump_trade_count_threshold: number;
+      weak_pump_avg_trade_size_threshold: number;
+      distribution_trade_count_threshold: number;
+      distribution_avg_trade_size_threshold: number;
+    };
+  };
+  signal_weights: {
+    ema_cross: number;
+    ema_level: number;
+    vwap_anchor: number;
+    combined_vwap: number;
+    bb_bounce: number;
+    bb_breakout: number;
+    bb_level: number;
+    bb_breakout_level: number;
+    volume_confirmation: number;
+    macd: number;
+    macd_level: number;
+    rsi_cross: number;
+    rsi_level: number;
+    underused_alpha: number;
+  };
 }
 
 export interface SignalWeights {
