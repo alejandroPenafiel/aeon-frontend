@@ -76,6 +76,29 @@ body {
   margin: 0.75rem auto;
   max-width: 960px;
   box-shadow: 0 0 10px #00ff7f33;
+  position: relative;
+}
+
+/* AssetDetails specific styling */
+.asset-details-container {
+  position: relative;
+}
+
+/* Agent dropdowns */
+.agent-dropdown {
+  position: absolute;
+}
+
+/* Config modal containers */
+.config-modal-container {
+  position: relative;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 @media (min-width: 640px) {
@@ -138,7 +161,7 @@ body {
 .sticky-aurora-header {
   position: sticky;
   top: 5rem;
-  z-index: 15;
+  z-index: 5;
   background: #000;
   padding: 0.75rem 0.75rem 0.25rem 0.75rem;
   margin: -0.75rem -0.75rem 0.75rem -0.75rem;

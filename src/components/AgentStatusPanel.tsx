@@ -640,6 +640,85 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             FILTER STATUS
                           </div>
 
+                          {/* Final Trade Decision - MOST IMPORTANT */}
+                          {status.chaosData.filter_analysis?.final_trade_decision && (
+                            <div className="mb-2 p-1 border border-yellow-700 bg-yellow-900/20">
+                              <div className="text-[11px] text-yellow-400 font-mono mb-1">
+                                FINAL TRADE DECISION
+                              </div>
+                              <div className="text-[10px] text-gray-300">
+                                <div>
+                                  Decision:{" "}
+                                  <span
+                                    className={`${
+                                      status.chaosData.filter_analysis.final_trade_decision === "BLOCKED" ? "text-red-400" : 
+                                      status.chaosData.filter_analysis.final_trade_decision === "ALLOWED" ? "text-green-400" : 
+                                      "text-yellow-400"
+                                    }`}
+                                  >
+                                    {status.chaosData.filter_analysis.final_trade_decision}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Underused Alpha Filter */}
+                          {status.chaosData.filter_analysis?.underused_alpha_filter && (
+                            <div className="mb-2 p-1 border border-orange-700 bg-orange-900/20">
+                              <div className="text-[11px] text-orange-400 font-mono mb-1">
+                                UNDERUSED ALPHA FILTER
+                              </div>
+                              <div className="text-[10px] text-gray-300">
+                                <div>
+                                  Status:{" "}
+                                  <span
+                                    className={`${status.chaosData.filter_analysis.underused_alpha_filter.status === "blocked" ? "text-red-400" : "text-green-400"}`}
+                                  >
+                                    {status.chaosData.filter_analysis.underused_alpha_filter.status?.toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  Reason:{" "}
+                                  <span className="text-orange-400">
+                                    {
+                                      status.chaosData.filter_analysis
+                                        .underused_alpha_filter.reason
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Combined VWAP Filter */}
+                          {status.chaosData.filter_analysis?.combined_vwap_filter && (
+                            <div className="mb-2 p-1 border border-indigo-700 bg-indigo-900/20">
+                              <div className="text-[11px] text-indigo-400 font-mono mb-1">
+                                COMBINED VWAP FILTER
+                              </div>
+                              <div className="text-[10px] text-gray-300">
+                                <div>
+                                  Status:{" "}
+                                  <span
+                                    className={`${status.chaosData.filter_analysis.combined_vwap_filter.status === "blocked" ? "text-red-400" : "text-green-400"}`}
+                                  >
+                                    {status.chaosData.filter_analysis.combined_vwap_filter.status?.toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  Reason:{" "}
+                                  <span className="text-indigo-400">
+                                    {
+                                      status.chaosData.filter_analysis
+                                        .combined_vwap_filter.reason
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Current Filter Analysis */}
                           {status.chaosData.filter_analysis?.trend_filter && (
                             <div className="mb-2 p-1 border border-purple-700 bg-purple-900/20">

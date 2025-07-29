@@ -6,7 +6,7 @@ interface VivienneAgentProps {
 }
 
 export const VivienneAgent: React.FC<VivienneAgentProps> = ({ data }) => {
-  const { chaos_discerned } = data.data;
+  const { chaos_discerned, filter_analysis, final_trade_decision } = data.data;
   
   if (!data.data) {
     return (
@@ -211,6 +211,84 @@ export const VivienneAgent: React.FC<VivienneAgentProps> = ({ data }) => {
             <div className="text-xs text-gray-300 font-mono leading-relaxed">
               {chaos.reasoning}
             </div>
+          </div>
+        )}
+
+        {/* Final Trade Decision */}
+        {final_trade_decision && (
+          <div className="mt-6 p-4 bg-black bg-opacity-30 rounded border border-gray-700">
+            <div className="text-sm text-gray-400 mb-2 font-bold">Final Trade Decision:</div>
+            <div className={`text-xs font-mono leading-relaxed ${
+              final_trade_decision === 'BLOCKED' ? 'text-red-400' : 
+              final_trade_decision === 'PASSED' ? 'text-green-400' : 
+              'text-yellow-400'
+            }`}>
+              {final_trade_decision}
+            </div>
+          </div>
+        )}
+
+        {/* Filter Analysis */}
+        {filter_analysis && (
+          <div className="mt-6 space-y-4">
+            <div className="text-sm text-gray-400 font-bold">Filter Analysis:</div>
+            
+            {/* Trend Filter */}
+            <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+              <div className="text-xs text-gray-400 mb-1 font-bold">Trend Filter:</div>
+              <div className={`text-xs font-mono ${filter_analysis.trend_filter.status === 'Blocked' ? 'text-red-400' : 'text-green-400'}`}>
+                {filter_analysis.trend_filter.status} - {filter_analysis.trend_filter.reason}
+              </div>
+            </div>
+
+            {/* Volatility Filter */}
+            <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+              <div className="text-xs text-gray-400 mb-1 font-bold">Volatility Filter:</div>
+              <div className={`text-xs font-mono ${filter_analysis.volatility_filter.status === 'Blocked' ? 'text-red-400' : 'text-green-400'}`}>
+                {filter_analysis.volatility_filter.status} - {filter_analysis.volatility_filter.reason}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                BB Bandwidth: {filter_analysis.volatility_filter.bollinger_bandwidth?.toFixed(4)}
+              </div>
+            </div>
+
+            {/* Levels Filter */}
+            <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+              <div className="text-xs text-gray-400 mb-1 font-bold">Levels Filter:</div>
+              <div className={`text-xs font-mono ${filter_analysis.levels_filter.status === 'Blocked' ? 'text-red-400' : 'text-green-400'}`}>
+                {filter_analysis.levels_filter.status} - {filter_analysis.levels_filter.reason}
+              </div>
+            </div>
+
+            {/* Underused Alpha Filter */}
+            <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+              <div className="text-xs text-gray-400 mb-1 font-bold">Underused Alpha Filter:</div>
+              <div className={`text-xs font-mono ${filter_analysis.underused_alpha_filter.status === 'Blocked' ? 'text-red-400' : 'text-green-400'}`}>
+                {filter_analysis.underused_alpha_filter.status} - {filter_analysis.underused_alpha_filter.reason}
+              </div>
+            </div>
+
+            {/* Combined VWAP Filter */}
+            <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+              <div className="text-xs text-gray-400 mb-1 font-bold">Combined VWAP Filter:</div>
+              <div className={`text-xs font-mono ${filter_analysis.combined_vwap_filter.status === 'Blocked' ? 'text-red-400' : 'text-green-400'}`}>
+                {filter_analysis.combined_vwap_filter.status} - {filter_analysis.combined_vwap_filter.reason}
+              </div>
+            </div>
+
+            {/* Final Trade Decision */}
+            {filter_analysis.final_trade_decision && (
+              <div className="p-3 bg-black bg-opacity-30 rounded border border-gray-700">
+                <div className="text-xs text-gray-400 mb-1 font-bold">Final Trade Decision:</div>
+                <div className={`text-xs font-mono ${
+                  filter_analysis.final_trade_decision === 'BLOCKED' ? 'text-red-400' : 
+                  filter_analysis.final_trade_decision === 'ALLOWED' ? 'text-green-400' : 
+                  'text-yellow-400'
+                }`}>
+                  {filter_analysis.final_trade_decision}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

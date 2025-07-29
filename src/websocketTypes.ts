@@ -239,6 +239,8 @@ export interface VivienneAgentData {
   chaos_discerned: Recommendation; // Reusing Recommendation interface as structure is similar
   latest_trend_filter_blocked?: TrendFilterBlocked;
   latest_volatility_filter_blocked?: VolatilityFilterBlocked;
+  filter_analysis?: FilterAnalysis;
+  final_trade_decision?: string;
 }
 
 export interface Signal {
@@ -412,4 +414,50 @@ export interface VolatilityFilterBlocked {
   size_percentage: number;
   triggering_state: string;
   reasoning_summary: string;
+}
+
+export interface FilterAnalysis {
+  trend_filter: TrendFilter;
+  volatility_filter: VolatilityFilter;
+  levels_filter: LevelsFilter;
+  underused_alpha_filter: UnderusedAlphaFilter;
+  combined_vwap_filter: CombinedVwapFilter;
+  final_trade_decision: string;
+}
+
+export interface TrendFilter {
+  filter_enabled: boolean;
+  trade_direction: string;
+  macd_trend: string;
+  status: string;
+  reason: string;
+}
+
+export interface VolatilityFilter {
+  filter_enabled: boolean;
+  bollinger_bandwidth: number;
+  squeeze_threshold: number;
+  breakout_threshold: number;
+  strategy_context: string;
+  status: string;
+  reason: string;
+}
+
+export interface LevelsFilter {
+  status: string;
+  reason: string;
+  resistance_analysis: ResistanceAnalysis;
+  support_analysis: SupportAnalysis;
+}
+
+export interface UnderusedAlphaFilter {
+  filter_enabled: boolean;
+  status: string;
+  reason: string;
+}
+
+export interface CombinedVwapFilter {
+  filter_enabled: boolean;
+  status: string;
+  reason: string;
 }

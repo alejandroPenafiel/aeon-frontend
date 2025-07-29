@@ -51,6 +51,24 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
   const vivienneSignificantSupport = vivienneData?.data?.filter_analysis?.levels_filter?.support_analysis?.significant_support;
   const vivienneSignificantResistance = vivienneData?.data?.filter_analysis?.levels_filter?.resistance_analysis?.significant_resistance;
 
+  // Click outside handler for config modal
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showConfigModal && !target.closest('.config-modal-container')) {
+        setShowConfigModal(false);
+      }
+    };
+
+    if (showConfigModal) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showConfigModal]);
+
   // Config update effect
   useEffect(() => {
     console.log('🔄 AuroraAgent: Config effect triggered', { config, auroraData });
@@ -726,7 +744,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
 
   return (
     <div className="bg-black text-green-400 p-4">
-      <div className="mb-4 sticky-aurora-header">
+      <div className="mb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-green-400">AURORA AGENT</h2>
@@ -752,89 +770,93 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             
             {/* Configuration Dropdown */}
             {showConfigModal && (
-              <div className="absolute top-full right-0 mt-2 z-50">
-                {/* Dropdown Content */}
-                <div className="bg-gray-900 border border-gray-700 p-4 font-mono text-xs shadow-2xl min-w-80">
-                  <div className="flex justify-end mb-3">
-                    {hasChanges && (
-                      <button
-                        onClick={handleCancelEdit}
-                        className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
-                      >
-                        CANCEL ALL
-                      </button>
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 bg-black bg-opacity-50" />
+                <div className="absolute top-full right-0 mt-2">
+                  {/* Dropdown Content */}
+                  <div className="bg-gray-900 border border-gray-700 p-4 font-mono text-xs shadow-2xl min-w-80 max-h-96 overflow-y-auto">
+                    <div className="flex justify-end mb-3">
+                      {hasChanges && (
+                        <button
+                          onClick={handleCancelEdit}
+                          className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
+                        >
+                          CANCEL ALL
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Debug info */}
+                    <div className="text-purple-400 text-xs mb-3">
+                      Debug: showConfigModal={showConfigModal.toString()}, 
+                      editableConfig keys: {Object.keys(editableConfig).length}, 
+                      config keys: {config ? Object.keys(config).length : 'null'}
+                    </div>
+                    
+                    {Object.keys(editableConfig).length > 0 ? (
+                      <div className="space-y-2">
+                        {Object.entries(editableConfig).map(([key, value]) => (
+                          <div key={key} className="bg-gray-800 border border-gray-700 p-2 rounded">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-400 font-mono text-xs">{key}:</span>
+                              <div className="flex items-center gap-2">
+                                {editingKey === key ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={editableConfig[key] || ''}
+                                      onChange={(e) => handleConfigChange(key, e.target.value)}
+                                      className="bg-black border border-gray-600 text-gray-300 px-2 py-1 text-xs w-20"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleSaveSingleConfig(key)}
+                                      disabled={isSaving}
+                                      className="text-green-400 hover:text-green-300 px-2 py-1 border border-green-400 hover:border-green-300 disabled:opacity-50 text-xs"
+                                    >
+                                      {isSaving ? 'SAVING...' : 'SAVE'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleCancelSingleEdit(key)}
+                                      className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
+                                    >
+                                      CANCEL
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-gray-300 text-xs">{value}</span>
+                                    <button
+                                      onClick={() => setEditingKey(key)}
+                                      className="text-blue-400 hover:text-blue-300 px-2 py-1 border border-blue-400 hover:border-blue-300 text-xs"
+                                    >
+                                      EDIT
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {unsavedChangesRef.current[key] !== undefined && (
+                              <div className="text-yellow-400 text-xs mt-1">
+                                ⚠️ Unsaved change: {unsavedChangesRef.current[key]}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 text-center py-4">
+                        No configuration data available
+                        <br />
+                        <span className="text-purple-400 text-xs">
+                          Config data: {config ? JSON.stringify(config) : 'null'}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  
-                  {/* Debug info */}
-                  <div className="text-purple-400 text-xs mb-3">
-                    Debug: showConfigModal={showConfigModal.toString()}, 
-                    editableConfig keys: {Object.keys(editableConfig).length}, 
-                    config keys: {config ? Object.keys(config).length : 'null'}
-                  </div>
-                  
-                  {Object.keys(editableConfig).length > 0 ? (
-                    <div className="space-y-2">
-                      {Object.entries(editableConfig).map(([key, value]) => (
-                        <div key={key} className="bg-gray-800 border border-gray-700 p-2 rounded">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 font-mono text-xs">{key}:</span>
-                            <div className="flex items-center gap-2">
-                              {editingKey === key ? (
-                                <>
-                                  <input
-                                    type="text"
-                                    value={editableConfig[key] || ''}
-                                    onChange={(e) => handleConfigChange(key, e.target.value)}
-                                    className="bg-black border border-gray-600 text-gray-300 px-2 py-1 text-xs w-20"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => handleSaveSingleConfig(key)}
-                                    disabled={isSaving}
-                                    className="text-green-400 hover:text-green-300 px-2 py-1 border border-green-400 hover:border-green-300 disabled:opacity-50 text-xs"
-                                  >
-                                    {isSaving ? 'SAVING...' : 'SAVE'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleCancelSingleEdit(key)}
-                                    className="text-red-400 hover:text-red-300 px-2 py-1 border border-red-400 hover:border-red-300 text-xs"
-                                  >
-                                    CANCEL
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-gray-300 text-xs">{value}</span>
-                                  <button
-                                    onClick={() => setEditingKey(key)}
-                                    className="text-blue-400 hover:text-blue-300 px-2 py-1 border border-blue-400 hover:border-blue-300 text-xs"
-                                  >
-                                    EDIT
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {unsavedChangesRef.current[key] !== undefined && (
-                            <div className="text-yellow-400 text-xs mt-1">
-                              ⚠️ Unsaved change: {unsavedChangesRef.current[key]}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-gray-500 text-center py-4">
-                      No configuration data available
-                      <br />
-                      <span className="text-purple-400 text-xs">
-                        Config data: {config ? JSON.stringify(config) : 'null'}
-                      </span>
-                    </div>
-                  )}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
