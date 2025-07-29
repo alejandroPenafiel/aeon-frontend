@@ -16,6 +16,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { FilterStatusPanel } from '../FilterStatusPanel';
+import { FilterStatusHeatmap } from '../FilterStatusHeatmap';
 
 interface AuroraAgentProps {
   assetSymbol?: string; // e.g., 'BTC', default to 'BTC'
@@ -837,6 +838,11 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
             )}
           </div>
         </div>
+      </div>
+
+      {/* Filter Status Heatmap */}
+      <div className="mb-4">
+        <FilterStatusHeatmap filterStatus={filterStatus} />
       </div>
 
       {/* Charts */}
