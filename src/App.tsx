@@ -6,6 +6,7 @@ import { AssetSelector } from "./components/AssetSelector";
 import { AssetDetails } from "./components/AssetDetails";
 import { SignalsFeed } from "./components/SignalsFeed";
 import AgentStatusPanel from "./components/AgentStatusPanel";
+import { MarketClosurePanel } from "./components/MarketClosurePanel";
 
 function App() {
   // Dynamic WebSocket URL that works for both local and network access
@@ -64,6 +65,13 @@ function App() {
           assetData={selectedAssetData}
           selectedAsset={selectedAsset}
           sendMessage={sendMessage}
+        />
+
+        {/* Market Closure Pipeline Panel */}
+        <MarketClosurePanel
+          tempestData={selectedAssetData?.agents?.TempestAgent}
+          sendMessage={sendMessage}
+          selectedAsset={selectedAsset}
         />
 
         {/* Signals Feed - Hidden per user request */}

@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { AssetData } from "../websocketTypes";
 
 interface AgentStatusPanelProps {
   assetData: AssetData | null;
-  selectedAsset: string | null;
+  selectedAsset: string | null; // Add missing selectedAsset prop
   sendMessage?: (message: any) => void; // Add WebSocket send function
 }
 
@@ -22,11 +22,19 @@ interface AgentStatus {
 
 export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
   assetData,
+  selectedAsset, // Add selectedAsset to destructuring
   sendMessage,
 }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [editingConfig, setEditingConfig] = useState<boolean>(false);
   const [configValues, setConfigValues] = useState<any>({});
+
+  // Clear configValues when not editing to ensure fresh data from WebSocket updates
+  useEffect(() => {
+    if (!editingConfig) {
+      setConfigValues({});
+    }
+  }, [editingConfig, assetData]);
 
   const toggleSection = (sectionKey: string) => {
     setExpandedSections(prev => ({
@@ -36,6 +44,10 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
   };
 
   const toggleConfigEditing = () => {
+    if (editingConfig) {
+      // When exiting edit mode, clear any unsaved changes
+      setConfigValues({});
+    }
     setEditingConfig(!editingConfig);
   };
 
@@ -57,68 +69,71 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
       return;
     }
 
-    try {
-      // Transform flat config values to nested structure expected by backend
-      const nestedConfig = {
-        state_thresholds: {
-          bang_threshold: configValues.bang_threshold ?? status.chaosData.config.bang_threshold,
-          aim_threshold: configValues.aim_threshold ?? status.chaosData.config.aim_threshold,
-          loaded_threshold: configValues.loaded_threshold ?? status.chaosData.config.loaded_threshold,
-        },
-        position_sizing: {
-          position_size_bang: configValues.position_size_bang ?? status.chaosData.config.position_size_bang,
-          position_size_aim: configValues.position_size_aim ?? status.chaosData.config.position_size_aim,
-          position_size_loaded: configValues.position_size_loaded ?? status.chaosData.config.position_size_loaded,
-          position_size_idle: configValues.position_size_idle ?? status.chaosData.config.position_size_idle,
-        },
-        filters: {
-          volatility_filter: {
-            enable_bollinger_filter_for_entry: configValues.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry,
-            bollinger_overextended_block: configValues.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block,
-            volatility_squeeze_threshold: configValues.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold,
-            volatility_breakout_threshold: configValues.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold,
-          },
-          trend_filter: {
-            enable_trend_filter_for_entry: configValues.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry,
-          },
-          levels_filter: {
-            enable_levels_filter_for_entry: configValues.enable_levels_filter_for_entry ?? false,
-            levels_buffer_percent: configValues.levels_buffer_percent ?? 0,
-          },
-          underused_alpha_filter: {
-            retail_chop_trade_count_threshold: configValues.retail_chop_trade_count_threshold ?? 0,
-            retail_chop_avg_trade_size_threshold: configValues.retail_chop_avg_trade_size_threshold ?? 0,
-          },
-          combined_vwap_filter: {
-            weak_pump_trade_count_threshold: configValues.weak_pump_trade_count_threshold ?? 0,
-            weak_pump_avg_trade_size_threshold: configValues.weak_pump_avg_trade_size_threshold ?? 0,
-            distribution_trade_count_threshold: configValues.distribution_trade_count_threshold ?? 0,
-            distribution_avg_trade_size_threshold: configValues.distribution_avg_trade_size_threshold ?? 0,
-          },
-        },
-        signal_weights: {
-          ema_cross: configValues.ema_cross ?? status.chaosData.config.ema_cross,
-          ema_level: configValues.ema_level ?? status.chaosData.config.ema_level,
-          vwap_anchor: configValues.vwap_anchor ?? 0,
-          combined_vwap: configValues.combined_vwap ?? 0,
-          bb_bounce: configValues.bb_bounce ?? status.chaosData.config.bb_bounce,
-          bb_breakout: configValues.bb_breakout ?? status.chaosData.config.bb_breakout,
-          bb_level: configValues.bb_level ?? status.chaosData.config.bb_level,
-          bb_breakout_level: configValues.bb_breakout_level ?? status.chaosData.config.bb_breakout_level,
-          volume_confirmation: configValues.volume_confirmation ?? 0,
-          macd: configValues.macd ?? status.chaosData.config.macd,
-          macd_level: configValues.macd_level ?? status.chaosData.config.macd_level,
-          rsi_cross: configValues.rsi_cross ?? status.chaosData.config.rsi_cross,
-          rsi_level: configValues.rsi_level ?? status.chaosData.config.rsi_level,
-          underused_alpha: configValues.underused_alpha ?? 0,
-        },
-      };
+    if (!assetData?.agents?.VivienneAgent?.config) {
+      console.error('❌ VivienneAgent config not available');
+      return;
+    }
 
+    try {
+      // Get the current config from the asset data
+      const currentConfig = assetData.agents.VivienneAgent.config;
+      
+      // Build flattened parameters object for ferrywheel format
+      const params: Record<string, any> = {};
+      
+      // General parameters
+      if (configValues.bang_threshold !== undefined) params.bang_threshold = configValues.bang_threshold;
+      if (configValues.aim_threshold !== undefined) params.aim_threshold = configValues.aim_threshold;
+      if (configValues.loaded_threshold !== undefined) params.loaded_threshold = configValues.loaded_threshold;
+      if (configValues.position_size_bang !== undefined) params.position_size_bang = configValues.position_size_bang;
+      if (configValues.position_size_aim !== undefined) params.position_size_aim = configValues.position_size_aim;
+      if (configValues.position_size_loaded !== undefined) params.position_size_loaded = configValues.position_size_loaded;
+      if (configValues.position_size_idle !== undefined) params.position_size_idle = configValues.position_size_idle;
+      
+      // Volatility filter parameters
+      if (configValues.enable_bollinger_filter_for_entry !== undefined) params.enable_bollinger_filter_for_entry = configValues.enable_bollinger_filter_for_entry;
+      if (configValues.bollinger_overextended_block !== undefined) params.bollinger_overextended_block = configValues.bollinger_overextended_block;
+      if (configValues.volatility_squeeze_threshold !== undefined) params.volatility_squeeze_threshold = configValues.volatility_squeeze_threshold;
+      if (configValues.volatility_breakout_threshold !== undefined) params.volatility_breakout_threshold = configValues.volatility_breakout_threshold;
+      
+      // Trend filter parameters
+      if (configValues.enable_trend_filter_for_entry !== undefined) params.enable_trend_filter_for_entry = configValues.enable_trend_filter_for_entry;
+      
+      // Levels filter parameters
+      if (configValues.enable_levels_filter_for_entry !== undefined) params.enable_levels_filter_for_entry = configValues.enable_levels_filter_for_entry;
+      if (configValues.levels_buffer_percent !== undefined) params.levels_buffer_percent = configValues.levels_buffer_percent;
+      
+      // Underused alpha filter parameters
+      if (configValues.retail_chop_trade_count_threshold !== undefined) params.retail_chop_trade_count_threshold = configValues.retail_chop_trade_count_threshold;
+      if (configValues.retail_chop_avg_trade_size_threshold !== undefined) params.retail_chop_avg_trade_size_threshold = configValues.retail_chop_avg_trade_size_threshold;
+      
+      // Combined VWAP filter parameters
+      if (configValues.weak_pump_trade_count_threshold !== undefined) params.weak_pump_trade_count_threshold = configValues.weak_pump_trade_count_threshold;
+      if (configValues.weak_pump_avg_trade_size_threshold !== undefined) params.weak_pump_avg_trade_size_threshold = configValues.weak_pump_avg_trade_size_threshold;
+      if (configValues.distribution_trade_count_threshold !== undefined) params.distribution_trade_count_threshold = configValues.distribution_trade_count_threshold;
+      if (configValues.distribution_avg_trade_size_threshold !== undefined) params.distribution_avg_trade_size_threshold = configValues.distribution_avg_trade_size_threshold;
+      
+      // Signal weights parameters
+      if (configValues.ema_cross !== undefined) params.ema_cross = configValues.ema_cross;
+      if (configValues.ema_level !== undefined) params.ema_level = configValues.ema_level;
+      if (configValues.vwap_anchor !== undefined) params.vwap_anchor = configValues.vwap_anchor;
+      if (configValues.combined_vwap !== undefined) params.combined_vwap = configValues.combined_vwap;
+      if (configValues.bb_bounce !== undefined) params.bb_bounce = configValues.bb_bounce;
+      if (configValues.bb_breakout !== undefined) params.bb_breakout = configValues.bb_breakout;
+      if (configValues.bb_level !== undefined) params.bb_level = configValues.bb_level;
+      if (configValues.bb_breakout_level !== undefined) params.bb_breakout_level = configValues.bb_breakout_level;
+      if (configValues.volume_confirmation !== undefined) params.volume_confirmation = configValues.volume_confirmation;
+      if (configValues.macd !== undefined) params.macd = configValues.macd;
+      if (configValues.macd_level !== undefined) params.macd_level = configValues.macd_level;
+      if (configValues.rsi_cross !== undefined) params.rsi_cross = configValues.rsi_cross;
+      if (configValues.rsi_level !== undefined) params.rsi_level = configValues.rsi_level;
+      if (configValues.underused_alpha !== undefined) params.underused_alpha = configValues.underused_alpha;
+
+      // Create WebSocket format message for VivienneAgent
       const configUpdateMessage = {
-        type: 'config_update',
-        agent: 'VivienneAgent',
+        type: "vivienne_config_update",
         asset: selectedAsset,
-        config: nestedConfig
+        config: params
       };
       
       sendMessage(configUpdateMessage);
@@ -195,57 +210,53 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
             vivienneData.latest_volatility_filter_blocked,
           // New levels filter data
           filter_analysis: vivienneData.filter_analysis,
-          // Configuration data
+          // Configuration data - Updated to match actual WebSocket structure
           config: vivienneConfig ? {
-            // Thresholds - Updated to use nested structure
-            bang_threshold: vivienneConfig.state_thresholds?.bang_threshold || 0,
-            aim_threshold: vivienneConfig.state_thresholds?.aim_threshold || 0,
-            loaded_threshold: vivienneConfig.state_thresholds?.loaded_threshold || 0,
-            // Position sizes - Updated to use nested structure
-            position_size_bang: vivienneConfig.position_sizing?.position_size_bang || 0,
-            position_size_aim: vivienneConfig.position_sizing?.position_size_aim || 0,
-            position_size_loaded: vivienneConfig.position_sizing?.position_size_loaded || 0,
-            position_size_idle: vivienneConfig.position_sizing?.position_size_idle || 0,
-            // State thresholds - Updated to use nested structure
-            state_threshold_aim: vivienneConfig.state_thresholds?.aim_threshold || 0,
-            state_threshold_bang: vivienneConfig.state_thresholds?.bang_threshold || 0,
-            state_threshold_loaded: vivienneConfig.state_thresholds?.loaded_threshold || 0,
-            // Filters - Updated to use nested structure
-            enable_trend_filter_for_entry: vivienneConfig.filters?.trend_filter?.enable_trend_filter_for_entry || false,
-            enable_bollinger_filter_for_entry: vivienneConfig.filters?.volatility_filter?.enable_bollinger_filter_for_entry || false,
-            bollinger_overextended_block: vivienneConfig.filters?.volatility_filter?.bollinger_overextended_block || false,
-            // Volatility settings - Updated to use nested structure
-            volatility_squeeze_threshold: vivienneConfig.filters?.volatility_filter?.volatility_squeeze_threshold || 0,
-            volatility_breakout_threshold: vivienneConfig.filters?.volatility_filter?.volatility_breakout_threshold || 0,
-            // Signal weights - Updated to use nested structure
+            // General config (thresholds and position sizes)
+            general: vivienneConfig.general || {},
+            // Individual config sections
+            volatility_filter: vivienneConfig.volatility_filter || {},
+            trend_filter: vivienneConfig.trend_filter || {},
+            levels_filter: vivienneConfig.levels_filter || {},
+            underused_alpha_filter: vivienneConfig.underused_alpha_filter || {},
+            combined_vwap_filter: vivienneConfig.combined_vwap_filter || {},
             signal_weights: vivienneConfig.signal_weights || {},
-            // Individual signal thresholds - Updated to use nested structure
-            macd: vivienneConfig.signal_weights?.macd || 0,
-            bb_level: vivienneConfig.signal_weights?.bb_level || 0,
-            bb_bounce: vivienneConfig.signal_weights?.bb_bounce || 0,
+            // Legacy flat access for backward compatibility
+            bang_threshold: vivienneConfig.general?.bang_threshold || 0,
+            aim_threshold: vivienneConfig.general?.aim_threshold || 0,
+            loaded_threshold: vivienneConfig.general?.loaded_threshold || 0,
+            position_size_bang: vivienneConfig.general?.position_size_bang || 0,
+            position_size_aim: vivienneConfig.general?.position_size_aim || 0,
+            position_size_loaded: vivienneConfig.general?.position_size_loaded || 0,
+            position_size_idle: vivienneConfig.general?.position_size_idle || 0,
+            enable_trend_filter_for_entry: vivienneConfig.trend_filter?.enable_trend_filter_for_entry || false,
+            enable_bollinger_filter_for_entry: vivienneConfig.volatility_filter?.enable_bollinger_filter_for_entry || false,
+            bollinger_overextended_block: vivienneConfig.volatility_filter?.bollinger_overextended_block || false,
+            volatility_squeeze_threshold: vivienneConfig.volatility_filter?.volatility_squeeze_threshold || 0,
+            volatility_breakout_threshold: vivienneConfig.volatility_filter?.volatility_breakout_threshold || 0,
+            enable_levels_filter_for_entry: vivienneConfig.levels_filter?.enable_levels_filter_for_entry || false,
+            levels_buffer_percent: vivienneConfig.levels_filter?.levels_buffer_percent || 0,
+            retail_chop_trade_count_threshold: vivienneConfig.underused_alpha_filter?.retail_chop_trade_count_threshold || 0,
+            retail_chop_avg_trade_size_threshold: vivienneConfig.underused_alpha_filter?.retail_chop_avg_trade_size_threshold || 0,
+            weak_pump_trade_count_threshold: vivienneConfig.combined_vwap_filter?.weak_pump_trade_count_threshold || 0,
+            weak_pump_avg_trade_size_threshold: vivienneConfig.combined_vwap_filter?.weak_pump_avg_trade_size_threshold || 0,
+            distribution_trade_count_threshold: vivienneConfig.combined_vwap_filter?.distribution_trade_count_threshold || 0,
+            distribution_avg_trade_size_threshold: vivienneConfig.combined_vwap_filter?.distribution_avg_trade_size_threshold || 0,
+            // Signal weights
             ema_cross: vivienneConfig.signal_weights?.ema_cross || 0,
             ema_level: vivienneConfig.signal_weights?.ema_level || 0,
+            vwap_anchor: vivienneConfig.signal_weights?.vwap_anchor || 0,
+            combined_vwap: vivienneConfig.signal_weights?.combined_vwap || 0,
+            bb_bounce: vivienneConfig.signal_weights?.bb_bounce || 0,
+            bb_breakout: vivienneConfig.signal_weights?.bb_breakout || 0,
+            bb_level: vivienneConfig.signal_weights?.bb_level || 0,
+            bb_breakout_level: vivienneConfig.signal_weights?.bb_breakout_level || 0,
+            volume_confirmation: vivienneConfig.signal_weights?.volume_confirmation || 0,
+            macd: vivienneConfig.signal_weights?.macd || 0,
+            macd_level: vivienneConfig.signal_weights?.macd_level || 0,
             rsi_cross: vivienneConfig.signal_weights?.rsi_cross || 0,
             rsi_level: vivienneConfig.signal_weights?.rsi_level || 0,
-            macd_level: vivienneConfig.signal_weights?.macd_level || 0,
-            bb_breakout: vivienneConfig.signal_weights?.bb_breakout || 0,
-            bb_breakout_level: vivienneConfig.signal_weights?.bb_breakout_level || 0,
-            // Additional parameters from nested structure
-            vwap_anchor: vivienneConfig.signal_weights?.vwap_anchor !== undefined ? vivienneConfig.signal_weights.vwap_anchor : 0,
-            combined_vwap: vivienneConfig.signal_weights?.combined_vwap !== undefined ? vivienneConfig.signal_weights.combined_vwap : 0,
-            volume_confirmation: vivienneConfig.signal_weights?.volume_confirmation !== undefined ? vivienneConfig.signal_weights.volume_confirmation : 0,
-            underused_alpha: vivienneConfig.signal_weights?.underused_alpha !== undefined ? vivienneConfig.signal_weights.underused_alpha : 0,
-            // Levels filter parameters
-            enable_levels_filter_for_entry: vivienneConfig.filters?.levels_filter?.enable_levels_filter_for_entry !== undefined ? vivienneConfig.filters.levels_filter.enable_levels_filter_for_entry : false,
-            levels_buffer_percent: vivienneConfig.filters?.levels_filter?.levels_buffer_percent !== undefined ? vivienneConfig.filters.levels_filter.levels_buffer_percent : 0,
-            // Underused alpha filter parameters
-            retail_chop_trade_count_threshold: vivienneConfig.filters?.underused_alpha_filter?.retail_chop_trade_count_threshold !== undefined ? vivienneConfig.filters.underused_alpha_filter.retail_chop_trade_count_threshold : 0,
-            retail_chop_avg_trade_size_threshold: vivienneConfig.filters?.underused_alpha_filter?.retail_chop_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.underused_alpha_filter.retail_chop_avg_trade_size_threshold : 0,
-            // Combined VWAP filter parameters
-            weak_pump_trade_count_threshold: vivienneConfig.filters?.combined_vwap_filter?.weak_pump_trade_count_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.weak_pump_trade_count_threshold : 0,
-            weak_pump_avg_trade_size_threshold: vivienneConfig.filters?.combined_vwap_filter?.weak_pump_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.weak_pump_avg_trade_size_threshold : 0,
-            distribution_trade_count_threshold: vivienneConfig.filters?.combined_vwap_filter?.distribution_trade_count_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.distribution_trade_count_threshold : 0,
-            distribution_avg_trade_size_threshold: vivienneConfig.filters?.combined_vwap_filter?.distribution_avg_trade_size_threshold !== undefined ? vivienneConfig.filters.combined_vwap_filter.distribution_avg_trade_size_threshold : 0,
+            underused_alpha: vivienneConfig.signal_weights?.underused_alpha || 0,
           } : null,
         },
       });
@@ -427,43 +438,43 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                 <div className="flex justify-between">
                   <span className="text-gray-400">Bang Threshold:</span>
                   <span className="text-yellow-400">
-                    {status.configData.bang_threshold}
+                    {status.configData.general?.bang_threshold || status.configData.bang_threshold}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Aim Threshold:</span>
                   <span className="text-yellow-400">
-                    {status.configData.aim_threshold}
+                    {status.configData.general?.aim_threshold || status.configData.aim_threshold}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Loaded Threshold:</span>
                   <span className="text-yellow-400">
-                    {status.configData.loaded_threshold}
+                    {status.configData.general?.loaded_threshold || status.configData.loaded_threshold}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Bang Size:</span>
                   <span className="text-green-400">
-                    {status.configData.position_size_bang}%
+                    {status.configData.general?.position_size_bang || status.configData.position_size_bang}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Aim Size:</span>
                   <span className="text-green-400">
-                    {status.configData.position_size_aim}%
+                    {status.configData.general?.position_size_aim || status.configData.position_size_aim}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Loaded Size:</span>
                   <span className="text-green-400">
-                    {status.configData.position_size_loaded}%
+                    {status.configData.general?.position_size_loaded || status.configData.position_size_loaded}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Idle Size:</span>
                   <span className="text-gray-400">
-                    {status.configData.position_size_idle}%
+                    {status.configData.general?.position_size_idle || status.configData.position_size_idle}%
                   </span>
                 </div>
               </div>
@@ -1313,12 +1324,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.bang_threshold ?? status.chaosData.config.bang_threshold}
+                                value={configValues.bang_threshold ?? status.chaosData.config.general?.bang_threshold ?? status.chaosData.config.bang_threshold}
                                 onChange={(e) => handleConfigChange('bang_threshold', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.bang_threshold
+                              status.chaosData.config.general?.bang_threshold ?? status.chaosData.config.bang_threshold
                             )}
                           </td>
                         </tr>
@@ -1328,12 +1339,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.aim_threshold ?? status.chaosData.config.aim_threshold}
+                                value={configValues.aim_threshold ?? status.chaosData.config.general?.aim_threshold ?? status.chaosData.config.aim_threshold}
                                 onChange={(e) => handleConfigChange('aim_threshold', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.aim_threshold
+                              status.chaosData.config.general?.aim_threshold ?? status.chaosData.config.aim_threshold
                             )}
                           </td>
                         </tr>
@@ -1343,12 +1354,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.loaded_threshold ?? status.chaosData.config.loaded_threshold}
+                                value={configValues.loaded_threshold ?? status.chaosData.config.general?.loaded_threshold ?? status.chaosData.config.loaded_threshold}
                                 onChange={(e) => handleConfigChange('loaded_threshold', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.loaded_threshold
+                              status.chaosData.config.general?.loaded_threshold ?? status.chaosData.config.loaded_threshold
                             )}
                           </td>
                         </tr>
@@ -1365,12 +1376,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.position_size_bang ?? status.chaosData.config.position_size_bang}
+                                value={configValues.position_size_bang ?? status.chaosData.config.general?.position_size_bang ?? status.chaosData.config.position_size_bang}
                                 onChange={(e) => handleConfigChange('position_size_bang', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              `${status.chaosData.config.position_size_bang}%`
+                              `${status.chaosData.config.general?.position_size_bang ?? status.chaosData.config.position_size_bang}%`
                             )}
                           </td>
                         </tr>
@@ -1380,12 +1391,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.position_size_aim ?? status.chaosData.config.position_size_aim}
+                                value={configValues.position_size_aim ?? status.chaosData.config.general?.position_size_aim ?? status.chaosData.config.position_size_aim}
                                 onChange={(e) => handleConfigChange('position_size_aim', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              `${status.chaosData.config.position_size_aim}%`
+                              `${status.chaosData.config.general?.position_size_aim ?? status.chaosData.config.position_size_aim}%`
                             )}
                           </td>
                         </tr>
@@ -1395,12 +1406,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.position_size_loaded ?? status.chaosData.config.position_size_loaded}
+                                value={configValues.position_size_loaded ?? status.chaosData.config.general?.position_size_loaded ?? status.chaosData.config.position_size_loaded}
                                 onChange={(e) => handleConfigChange('position_size_loaded', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-green-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              `${status.chaosData.config.position_size_loaded}%`
+                              `${status.chaosData.config.general?.position_size_loaded ?? status.chaosData.config.position_size_loaded}%`
                             )}
                           </td>
                         </tr>
@@ -1410,12 +1421,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.position_size_idle ?? status.chaosData.config.position_size_idle}
+                                value={configValues.position_size_idle ?? status.chaosData.config.general?.position_size_idle ?? status.chaosData.config.position_size_idle}
                                 onChange={(e) => handleConfigChange('position_size_idle', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-gray-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              `${status.chaosData.config.position_size_idle}%`
+                              `${status.chaosData.config.general?.position_size_idle ?? status.chaosData.config.position_size_idle}%`
                             )}
                           </td>
                         </tr>
@@ -1428,10 +1439,10 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                         </tr>
                         <tr>
                           <td className="text-gray-400 pr-2">Bollinger Filter:</td>
-                          <td className={`text-right ${status.chaosData.config.enable_bollinger_filter_for_entry ? 'text-green-400' : 'text-red-400'}`}>
+                          <td className={`text-right ${(status.chaosData.config.volatility_filter?.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry) ? 'text-green-400' : 'text-red-400'}`}>
                             {editingConfig ? (
                               <select
-                                value={configValues.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry}
+                                value={configValues.enable_bollinger_filter_for_entry ?? status.chaosData.config.volatility_filter?.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry}
                                 onChange={(e) => handleConfigChange('enable_bollinger_filter_for_entry', e.target.value === 'true')}
                                 className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
                               >
@@ -1439,16 +1450,16 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 <option value="false">Disabled</option>
                               </select>
                             ) : (
-                              status.chaosData.config.enable_bollinger_filter_for_entry ? 'Enabled' : 'Disabled'
+                              (status.chaosData.config.volatility_filter?.enable_bollinger_filter_for_entry ?? status.chaosData.config.enable_bollinger_filter_for_entry) ? 'Enabled' : 'Disabled'
                             )}
                           </td>
                         </tr>
                         <tr>
                           <td className="text-gray-400 pr-2">Overextended Block:</td>
-                          <td className={`text-right ${status.chaosData.config.bollinger_overextended_block ? 'text-red-400' : 'text-green-400'}`}>
+                          <td className={`text-right ${(status.chaosData.config.volatility_filter?.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block) ? 'text-red-400' : 'text-green-400'}`}>
                             {editingConfig ? (
                               <select
-                                value={configValues.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block}
+                                value={configValues.bollinger_overextended_block ?? status.chaosData.config.volatility_filter?.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block}
                                 onChange={(e) => handleConfigChange('bollinger_overextended_block', e.target.value === 'true')}
                                 className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
                               >
@@ -1456,7 +1467,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 <option value="false">Allowed</option>
                               </select>
                             ) : (
-                              status.chaosData.config.bollinger_overextended_block ? 'Blocked' : 'Allowed'
+                              (status.chaosData.config.volatility_filter?.bollinger_overextended_block ?? status.chaosData.config.bollinger_overextended_block) ? 'Blocked' : 'Allowed'
                             )}
                           </td>
                         </tr>
@@ -1466,12 +1477,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold}
+                                value={configValues.volatility_squeeze_threshold ?? status.chaosData.config.volatility_filter?.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold}
                                 onChange={(e) => handleConfigChange('volatility_squeeze_threshold', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-blue-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.volatility_squeeze_threshold
+                              status.chaosData.config.volatility_filter?.volatility_squeeze_threshold ?? status.chaosData.config.volatility_squeeze_threshold
                             )}
                           </td>
                         </tr>
@@ -1481,12 +1492,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold}
+                                value={configValues.volatility_breakout_threshold ?? status.chaosData.config.volatility_filter?.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold}
                                 onChange={(e) => handleConfigChange('volatility_breakout_threshold', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-blue-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.volatility_breakout_threshold
+                              status.chaosData.config.volatility_filter?.volatility_breakout_threshold ?? status.chaosData.config.volatility_breakout_threshold
                             )}
                           </td>
                         </tr>
@@ -1499,10 +1510,10 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                         </tr>
                         <tr>
                           <td className="text-gray-400 pr-2">Trend Filter Entry:</td>
-                          <td className={`text-right ${status.chaosData.config.enable_trend_filter_for_entry ? 'text-green-400' : 'text-red-400'}`}>
+                          <td className={`text-right ${(status.chaosData.config.trend_filter?.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry) ? 'text-green-400' : 'text-red-400'}`}>
                             {editingConfig ? (
                               <select
-                                value={configValues.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry}
+                                value={configValues.enable_trend_filter_for_entry ?? status.chaosData.config.trend_filter?.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry}
                                 onChange={(e) => handleConfigChange('enable_trend_filter_for_entry', e.target.value === 'true')}
                                 className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
                               >
@@ -1510,7 +1521,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 <option value="false">Disabled</option>
                               </select>
                             ) : (
-                              status.chaosData.config.enable_trend_filter_for_entry ? 'Enabled' : 'Disabled'
+                              (status.chaosData.config.trend_filter?.enable_trend_filter_for_entry ?? status.chaosData.config.enable_trend_filter_for_entry) ? 'Enabled' : 'Disabled'
                             )}
                           </td>
                         </tr>
@@ -1526,7 +1537,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                           <td className="text-orange-400 text-right">
                             {editingConfig ? (
                               <select
-                                value={configValues.enable_levels_filter_for_entry ?? status.chaosData.config.enable_levels_filter_for_entry}
+                                value={configValues.enable_levels_filter_for_entry ?? status.chaosData.config.levels_filter?.enable_levels_filter_for_entry ?? status.chaosData.config.enable_levels_filter_for_entry}
                                 onChange={(e) => handleConfigChange('enable_levels_filter_for_entry', e.target.value === 'true')}
                                 className="w-20 text-right bg-gray-800 border border-gray-600 px-1"
                               >
@@ -1534,7 +1545,7 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                                 <option value="false">Disabled</option>
                               </select>
                             ) : (
-                              status.chaosData.config.enable_levels_filter_for_entry ? 'Enabled' : 'Disabled'
+                              (status.chaosData.config.levels_filter?.enable_levels_filter_for_entry ?? status.chaosData.config.enable_levels_filter_for_entry) ? 'Enabled' : 'Disabled'
                             )}
                           </td>
                         </tr>
@@ -1544,12 +1555,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.levels_buffer_percent ?? status.chaosData.config.levels_buffer_percent}
+                                value={configValues.levels_buffer_percent ?? status.chaosData.config.levels_filter?.levels_buffer_percent ?? status.chaosData.config.levels_buffer_percent}
                                 onChange={(e) => handleConfigChange('levels_buffer_percent', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-orange-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              `${status.chaosData.config.levels_buffer_percent}%`
+                              `${status.chaosData.config.levels_filter?.levels_buffer_percent ?? status.chaosData.config.levels_buffer_percent}%`
                             )}
                           </td>
                         </tr>
@@ -1670,12 +1681,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.ema_cross ?? status.chaosData.config.ema_cross}
+                                value={configValues.ema_cross ?? status.chaosData.config.signal_weights?.ema_cross ?? status.chaosData.config.ema_cross}
                                 onChange={(e) => handleConfigChange('ema_cross', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.ema_cross
+                              status.chaosData.config.signal_weights?.ema_cross ?? status.chaosData.config.ema_cross
                             )}
                           </td>
                         </tr>
@@ -1685,12 +1696,12 @@ export const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({
                             {editingConfig ? (
                               <input
                                 type="number"
-                                value={configValues.ema_level ?? status.chaosData.config.ema_level}
+                                value={configValues.ema_level ?? status.chaosData.config.signal_weights?.ema_level ?? status.chaosData.config.ema_level}
                                 onChange={(e) => handleConfigChange('ema_level', parseFloat(e.target.value))}
                                 className="w-16 text-right bg-gray-800 text-yellow-400 border border-gray-600 px-1"
                               />
                             ) : (
-                              status.chaosData.config.ema_level
+                              status.chaosData.config.signal_weights?.ema_level ?? status.chaosData.config.ema_level
                             )}
                           </td>
                         </tr>

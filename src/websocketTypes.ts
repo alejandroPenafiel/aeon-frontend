@@ -365,8 +365,118 @@ export interface SignalWeights {
 }
 
 export interface TempestAgent {
-  data: {};
-  config: {};
+  data: TempestAgentData;
+  config: TempestAgentConfig;
+}
+
+export interface TempestAgentData {
+  position_analysis?: PositionAnalysis;
+  strategy_results?: StrategyResult[];
+  closure_recommendation?: ClosureRecommendation;
+  winning_strategy?: string;
+  reason_code?: string;
+  should_close?: boolean;
+  analysis_timestamp?: string;
+  execution_status?: string;
+  metadata?: {
+    asset_symbol: string;
+    last_updated: string;
+    data_version: string;
+  };
+}
+
+export interface TechnicalData {
+  current_price: number;
+  entry_price: number;
+  ema3: number;
+  ema21: number;
+  atr: number;
+  rsi: number;
+  macd: number;
+  position: any;
+  // UnrealizedPnL specific fields
+  price_movement?: number;
+  max_favorable?: number;
+  retracement_from_peak?: number;
+  retracement_threshold?: number;
+  active_threshold?: string;
+  unrealized_pnl?: number;
+  is_threshold_1_active?: boolean;
+  is_threshold_2_active?: boolean;
+  is_threshold_3_active?: boolean;
+  is_retracing?: boolean;
+  max_favorable_movement?: number;
+}
+
+export interface StrategyParameters {
+  // ROEThresholdStrategy
+  min_roe_threshold?: number;
+  max_roe_threshold?: number;
+  // StopLossTakeProfitStrategy
+  stop_loss_percentage?: number;
+  take_profit_percentage?: number;
+  // EMACrossoverStrategy
+  short_ema_period?: number;
+  long_ema_period?: number;
+  min_difference_percentage?: number;
+  // ATRStopLossStrategy
+  atr_multiplier?: number;
+  move_to_breakeven?: boolean;
+  breakeven_trigger?: number;
+  use_trailing_stop?: boolean;
+  trailing_activation?: number;
+  trail_by_atr?: number;
+  // UnrealizedPnLStrategy
+  stop_loss_multiplier?: number;
+  threshold_1_multiplier?: number;
+  threshold_2_multiplier?: number;
+  threshold_3_multiplier?: number;
+  threshold_1_retracement?: number;
+  threshold_2_retracement?: number;
+  threshold_3_retracement?: number;
+}
+
+export interface StrategyResult {
+  name: string;
+  should_close: boolean;
+  reason_code: string | null;
+  details: string | null;
+  confidence: number;
+  technical_data: TechnicalData;
+  parameters: StrategyParameters;
+}
+
+export interface ClosureRecommendation {
+  should_close: boolean;
+  winning_strategy: string;
+  reason_code: string;
+  details: string;
+  confidence: number;
+}
+
+export interface PositionAnalysis {
+  asset: string;
+  position_type: string;
+  size: number;
+  entry_price: number;
+  mark_price: number;
+  unrealized_pnl: number;
+  roe: number;
+}
+
+export interface TempestAgentConfig {
+  use_trailing_stop?: boolean;
+  trailing_activation?: number;
+  trail_by_atr?: number;
+  UnrealizedPnLStrategy?: {
+    stop_loss_multiplier: number;
+    threshold_1_multiplier: number;
+    threshold_2_multiplier: number;
+    threshold_3_multiplier: number;
+    threshold_1_retracement: number;
+    threshold_2_retracement: number;
+    threshold_3_retracement: number;
+  };
 }
 
 export interface VesperAgent {
