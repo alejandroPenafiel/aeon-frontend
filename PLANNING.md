@@ -7,7 +7,7 @@ Build a modular, high-density, single-page financial dashboard frontend in React
 ## 🧱 Core Structure
 
 - **Frontend**: React + TypeScript + TailwindCSS
-- **Backend**: FastAPI + Redis Pub/Sub + Postgres
+- **Backend**: Redis Pub/Sub
 - **Realtime Bridge**: WebSocket (Redis → FastAPI → React)
 
 ## 🎨 Design Guidelines (from `design.mdc`)

@@ -275,6 +275,11 @@ export function validateTempestConfig(config: any): boolean {
   
   // Check that all strategy names are valid
   for (const strategyName of Object.keys(config)) {
+    // Allow pause_closure as a top-level property
+    if (strategyName === 'pause_closure') {
+      continue;
+    }
+    
     if (!TEMPEST_STRATEGIES.includes(strategyName as TempestStrategyName)) {
       console.warn(`Invalid strategy name: ${strategyName}`);
       return false;

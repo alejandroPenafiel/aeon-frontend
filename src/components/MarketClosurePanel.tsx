@@ -143,7 +143,7 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
         console.log('📦 Cache initialized for', selectedAsset);
       }
     }
-  }, [selectedAsset, tempestData?.config, cache]);
+  }, [selectedAsset, tempestData?.config]);
 
   // Initialize config values when editing starts
   useEffect(() => {
@@ -156,18 +156,22 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
         const initialValues: Record<string, any> = {};
         
         // Flatten the nested config structure
-        Object.entries(configToUse).forEach(([strategyName, strategyConfig]) => {
-          if (strategyConfig && typeof strategyConfig === 'object') {
-            Object.entries(strategyConfig).forEach(([paramName, value]) => {
-              initialValues[`${strategyName}.${paramName}`] = value;
+        Object.entries(configToUse).forEach(([key, value]) => {
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            // This is a strategy object
+            Object.entries(value).forEach(([paramName, paramValue]) => {
+              initialValues[`${key}.${paramName}`] = paramValue;
             });
+          } else {
+            // This is a top-level parameter like pause_closure
+            initialValues[key] = value;
           }
         });
         
         setConfigValues(initialValues);
       }
     }
-  }, [editingConfig, tempestData?.config, selectedAsset, cache]);
+  }, [editingConfig, tempestData?.config, selectedAsset]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -177,17 +181,25 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
     if (!sendMessage || !selectedAsset) return;
 
     // Get changes from cache
-    const changes = cache.getChanges();
+    const changesFromCache = cache.getChanges();
     
-    if (Object.keys(changes).length === 0) {
+    if (Object.keys(changesFromCache).length === 0) {
       console.log('📝 No changes to save');
       setEditingConfig(false);
       return;
     }
 
+    // Separate top-level changes from strategy changes
+    const { 'top-level': topLevelChanges, ...strategyChanges } = changesFromCache;
+    const finalChanges: Record<string, any> = { ...strategyChanges };
+    if (topLevelChanges) {
+      // Add top-level changes to the root of the config
+      Object.assign(finalChanges, topLevelChanges);
+    }
+
     // Validate the config before sending
-    if (validateTempestConfig(changes)) {
-      sendTempestConfigUpdate(sendMessage, selectedAsset, changes);
+    if (validateTempestConfig(finalChanges)) {
+      sendTempestConfigUpdate(sendMessage, selectedAsset, finalChanges);
       cache.markAsSaved();
       setEditingConfig(false);
       console.log('✅ Configuration saved successfully');
@@ -212,29 +224,54 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
     setTimeout(() => setIsUpdating(false), 1000);
   };
 
-  const handleParameterChange = (strategyName: string, paramName: string, value: string) => {
+  const handleParameterChange = (strategyNameOrParam: string, paramNameOrValue: string, value?: string) => {
     let processedValue: any;
-    
-    // Handle boolean values (for select dropdowns)
-    if (value === 'true' || value === 'false') {
-      processedValue = value === 'true';
+    let paramPath: string;
+
+    // Handle top-level parameters like pause_closure, called as handleParameterChange('pause_closure', 'true')
+    if (value === undefined) {
+      paramPath = strategyNameOrParam;
+      const val = paramNameOrValue;
+      if (val === 'true' || val === 'false') {
+        processedValue = val === 'true';
+      } else {
+        processedValue = val === '' ? undefined : parseFloat(val);
+      }
     } else {
-      // Handle numeric values
-      processedValue = value === '' ? undefined : parseFloat(value);
+      // Handle nested strategy parameters, called as handleParameterChange('Strategy', 'param', 'value')
+      const strategyName = strategyNameOrParam;
+      const paramName = paramNameOrValue;
+      paramPath = `${strategyName}.${paramName}`;
+      
+      if (value === 'true' || value === 'false') {
+        processedValue = value === 'true';
+      } else {
+        processedValue = value === '' ? undefined : parseFloat(value);
+      }
     }
     
     // Update local state
     setConfigValues({
       ...configValues,
-      [`${strategyName}.${paramName}`]: processedValue
+      [paramPath]: processedValue
     });
 
     // Update cache with the new value
     if (processedValue !== undefined && (typeof processedValue === 'boolean' || !isNaN(processedValue))) {
-      cache.updateParameter(strategyName, paramName, processedValue);
-      console.log(`📝 Parameter updated in cache: ${strategyName}.${paramName} = ${processedValue}`);
+      if (value !== undefined) {
+        const strategyName = strategyNameOrParam;
+        const paramName = paramNameOrValue;
+        cache.updateParameter(strategyName, paramName, processedValue);
+        console.log(`📝 Parameter updated in cache: ${strategyName}.${paramName} = ${processedValue}`);
+      } else {
+        // For top-level params, use the new 'top-level' format
+        cache.updateParameter('top-level', strategyNameOrParam, processedValue);
+        console.log(`📝 Parameter updated in cache: top-level.${strategyNameOrParam} = ${processedValue}`);
+      }
     }
   };
+
+  
 
   // Safe check for data availability
   if (!tempestData) {
@@ -251,6 +288,7 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
 
   // Extract data from the real structure - tempestData.data contains the rich metadata
   const tempestDataActual = tempestData.data as TempestAgentDataLocal;
+  const isClosurePaused = (tempestData.data as any)?.is_closure_paused ?? tempestData.config?.pause_closure ?? false;
   const positionAnalysis = tempestDataActual?.position_analysis;
   const strategyResults = tempestDataActual?.strategy_results || [];
   const closureRecommendation = tempestDataActual?.closure_recommendation;
@@ -1293,6 +1331,49 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
                     </div>
                   </div>
 
+                  {/* Resistance Exit Strategy */}
+                  <div className="p-3 border border-gray-600 bg-gray-800">
+                    <h5 className="text-green-400 text-sm font-semibold mb-2">Resistance Exit Strategy</h5>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-gray-400">Resistance Threshold:</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={configValues['ResistanceExitStrategy.resistance_threshold'] ?? ''}
+                          onChange={(e) => handleParameterChange('ResistanceExitStrategy', 'resistance_threshold', e.target.value)}
+                          className="w-full bg-gray-700 border border-gray-600 px-2 py-1 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400">Profit Taking Percentage:</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={configValues['ResistanceExitStrategy.profit_taking_percentage'] ?? ''}
+                          onChange={(e) => handleParameterChange('ResistanceExitStrategy', 'profit_taking_percentage', e.target.value)}
+                          className="w-full bg-gray-700 border border-gray-600 px-2 py-1 text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pause Closure Control */}
+                  <div className="p-3 border border-gray-600 bg-gray-800">
+                    <h5 className="text-red-400 text-sm font-semibold mb-2">Closure Control</h5>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 text-xs">Pause Closure Pipeline:</span>
+                      <select
+                        value={configValues.pause_closure ?? (isClosurePaused ? 'true' : 'false')}
+                        onChange={(e) => handleParameterChange('pause_closure', e.target.value)}
+                        className="px-3 py-1 text-xs font-bold rounded bg-gray-700 border border-gray-600 text-white"
+                      >
+                        <option value="false">🟢 ACTIVE</option>
+                        <option value="true">🔴 PAUSED</option>
+                      </select>
+                    </div>
+                  </div>
+
                   {/* Save Button */}
                   <div className="flex justify-end">
                     <button
@@ -1468,6 +1549,40 @@ export const MarketClosurePanel: React.FC<MarketClosurePanelProps> = ({ tempestD
                           {tempestData?.config?.UnrealizedPnLStrategy?.threshold_3_retracement ?? 'N/A'}
                         </span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Resistance Exit Strategy */}
+                  <div className="p-3 border border-gray-600 bg-gray-800">
+                    <h5 className="text-green-400 text-sm font-semibold mb-2">Resistance Exit Strategy</h5>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Resistance Threshold:</span>
+                        <span className="text-blue-400 font-bold">
+                          {tempestData?.config?.ResistanceExitStrategy?.resistance_threshold ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Profit Taking Percentage:</span>
+                        <span className="text-blue-400 font-bold">
+                          {tempestData?.config?.ResistanceExitStrategy?.profit_taking_percentage ?? 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pause Closure Control Display */}
+                  <div className="p-3 border border-gray-600 bg-gray-800">
+                    <h5 className="text-red-400 text-sm font-semibold mb-2">Closure Control</h5>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 text-xs">Pause Closure:</span>
+                      <span className={`text-xs font-bold ${
+                        isClosurePaused 
+                          ? 'text-red-400' 
+                          : 'text-green-400'
+                      }`}>
+                        {isClosurePaused ? 'PAUSED' : 'ACTIVE'}
+                      </span>
                     </div>
                   </div>
                 </div>

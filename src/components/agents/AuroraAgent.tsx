@@ -434,7 +434,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
         <div className="bg-black border border-gray-600 p-2 rounded shadow-lg">
           <p className="text-gray-300 text-xs mb-1">{label}</p>
           {payload.map((entry: any, index: number) => (
-            <p key={index} style={{ color: entry.color }} className="text-xs">
+            <p key={`${entry.name}-${index}`} style={{ color: entry.color }} className="text-xs">
               {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(5) : entry.value}
             </p>
           ))}
@@ -476,7 +476,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           
           return (
             <div
-              key={index}
+              key={`${entry.value}-${index}`}
               className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer transition-opacity ${
                 isVisible ? 'opacity-100' : 'opacity-40'
               }`}
@@ -935,7 +935,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
                               const hasUnsavedChange = unsavedChangesRef.current[key] !== undefined;
                               
                               return (
-                                <div key={key} className={`bg-gray-800 border ${hasUnsavedChange ? 'border-yellow-500' : 'border-gray-700'} p-3 rounded`}>
+                                <div key={`${groupName}-${key}`} className={`bg-gray-800 border ${hasUnsavedChange ? 'border-yellow-500' : 'border-gray-700'} p-3 rounded`}>
                                   <div className="flex justify-between items-start">
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 mb-1">
@@ -1037,7 +1037,7 @@ export const AuroraAgent: React.FC<AuroraAgentProps> = ({ assetSymbol = 'BTC', f
           <h3 className="text-lg font-bold text-green-400 mb-2">SIGNALS</h3>
           <div className="space-y-2">
             {signals.slice(-5).map((signal: any, index: number) => (
-                                 <div key={index} className="bg-black border border-gray-700 p-2 rounded">
+                                 <div key={`${signal.type}-${signal.direction}-${index}`} className="bg-black border border-gray-700 p-2 rounded">
                 <div className="flex justify-between items-start">
                   <span className="text-sm font-mono">{signal.type}</span>
                   <span className={`text-xs px-2 py-1 rounded ${

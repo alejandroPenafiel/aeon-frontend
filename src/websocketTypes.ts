@@ -465,9 +465,26 @@ export interface PositionAnalysis {
 }
 
 export interface TempestAgentConfig {
-  use_trailing_stop?: boolean;
-  trailing_activation?: number;
-  trail_by_atr?: number;
+  // Strategy configurations
+  ROEThresholdStrategy?: {
+    roe_threshold: number;
+    roe_take_profit: number;
+  };
+  StopLossTakeProfitStrategy?: {
+    stop_loss_pct: number;
+    take_profit_pct: number;
+  };
+  EMACrossoverStrategy?: {
+    min_ema_difference_pct: number;
+  };
+  ATRStopLossStrategy?: {
+    atr_multiplier: number;
+    move_to_breakeven: boolean;
+    breakeven_trigger: number;
+    use_trailing_stop: boolean;
+    trailing_activation: number;
+    trail_by_atr: number;
+  };
   UnrealizedPnLStrategy?: {
     stop_loss_multiplier: number;
     threshold_1_multiplier: number;
@@ -477,6 +494,12 @@ export interface TempestAgentConfig {
     threshold_2_retracement: number;
     threshold_3_retracement: number;
   };
+  ResistanceExitStrategy?: {
+    resistance_threshold: number;
+    profit_taking_percentage: number;
+  };
+  // Global control
+  pause_closure?: boolean;
 }
 
 export interface VesperAgent {

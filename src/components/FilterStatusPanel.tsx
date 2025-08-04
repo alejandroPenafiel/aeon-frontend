@@ -160,7 +160,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
           const entryNumber = index + 1; // Chronological numbering (oldest = #1)
           
           return (
-            <div key={entry.timestamp} className="border border-gray-700 bg-black">
+            <div key={`${entry.timestamp}-${index}`} className="border border-gray-700 bg-black">
               {/* Entry Header */}
               <div 
                 className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-800 transition-colors"
@@ -195,7 +195,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                   {/* Individual Filters */}
                   <div className="space-y-2 mb-3">
                     {entry.filters.map((filter, filterIndex) => (
-                      <div key={filterIndex} className="bg-gray-900 border border-gray-600 p-2 rounded">
+                      <div key={`${entry.timestamp}-${filter.name}-${filterIndex}`} className="bg-gray-900 border border-gray-600 p-2 rounded">
                         <div 
                           className="flex justify-between items-center cursor-pointer hover:bg-gray-800 transition-colors"
                           onClick={() => toggleFilter(`${entry.timestamp}-${filter.name}`)}
@@ -261,11 +261,11 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                                       // Handle nested objects (like resistance_analysis)
                                       if (typeof value === 'object' && !Array.isArray(value)) {
                                         return (
-                                          <div key={key} className="col-span-2">
+                                          <div key={`${entry.timestamp}-${filter.name}-${key}`} className="col-span-2">
                                             <div className="text-gray-500 mb-1 font-mono">{key.toUpperCase()}:</div>
                                             <div className="ml-2 space-y-1">
                                               {Object.entries(value).map(([nestedKey, nestedValue]: [string, any]) => (
-                                                <div key={nestedKey}>
+                                                <div key={`${entry.timestamp}-${filter.name}-${key}-${nestedKey}`}>
                                                   <span className="text-gray-500">{nestedKey}:</span>
                                                   <span className="ml-1 text-purple-400">
                                                     {typeof nestedValue === 'number' ? nestedValue.toFixed(4) : 
@@ -280,7 +280,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                                       }
                                       
                                       return (
-                                        <div key={key}>
+                                        <div key={`${entry.timestamp}-${filter.name}-${key}`}>
                                           <span className="text-gray-500">{key}:</span>
                                           <span className="ml-1 text-purple-400">
                                             {typeof value === 'number' ? value.toFixed(4) : 
@@ -384,7 +384,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                                 <div className="text-green-400 text-[10px] mb-1">LONG SIGNALS ({entry.chaos_discerned.sorting_signals.long.length}):</div>
                                 <div className="space-y-1">
                                   {entry.chaos_discerned.sorting_signals.long.map((signal: any, signalIndex: number) => (
-                                    <div key={signalIndex} className="bg-green-900/20 border border-green-700 p-1 rounded text-[9px]">
+                                    <div key={`${entry.timestamp}-green-${signalIndex}`} className="bg-green-900/20 border border-green-700 p-1 rounded text-[9px]">
                                       <div className="flex justify-between items-start">
                                         <span className="text-green-300 font-mono">{signal.name}</span>
                                         <div className="flex gap-1">
@@ -414,7 +414,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                                 <div className="text-red-400 text-[10px] mb-1">SHORT SIGNALS ({entry.chaos_discerned.sorting_signals.short.length}):</div>
                                 <div className="space-y-1">
                                   {entry.chaos_discerned.sorting_signals.short.map((signal: any, signalIndex: number) => (
-                                    <div key={signalIndex} className="bg-red-900/20 border border-red-700 p-1 rounded text-[9px]">
+                                    <div key={`${entry.timestamp}-red-${signalIndex}`} className="bg-red-900/20 border border-red-700 p-1 rounded text-[9px]">
                                       <div className="flex justify-between items-start">
                                         <span className="text-red-300 font-mono">{signal.name}</span>
                                         <div className="flex gap-1">
@@ -444,7 +444,7 @@ export const FilterStatusPanel: React.FC<FilterStatusPanelProps> = ({ filterStat
                                 <div className="text-gray-400 text-[10px] mb-1">NEUTRAL SIGNALS ({entry.chaos_discerned.sorting_signals.neutral.length}):</div>
                                 <div className="space-y-1">
                                   {entry.chaos_discerned.sorting_signals.neutral.map((signal: any, signalIndex: number) => (
-                                    <div key={signalIndex} className="bg-gray-800 border border-gray-600 p-1 rounded text-[9px]">
+                                    <div key={`${entry.timestamp}-neutral-${signalIndex}`} className="bg-gray-800 border border-gray-600 p-1 rounded text-[9px]">
                                       <div className="flex justify-between items-start">
                                         <span className="text-gray-300 font-mono">{signal.name}</span>
                                         <div className="flex gap-1">
