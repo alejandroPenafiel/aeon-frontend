@@ -26,3 +26,4 @@ dist-ssr
 # Custom Ignores
 scripts/
 websocket_schema.json
+backend_experts/
